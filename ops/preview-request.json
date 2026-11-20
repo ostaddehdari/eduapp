@@ -1,4 +1,4 @@
 {
-  "action": "test",
-  "request_id": "001"
+  "action": "deploy-static",
+  "request_id": "002"
 }
