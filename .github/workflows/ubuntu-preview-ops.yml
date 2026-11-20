@@ -1,0 +1,63 @@
+name: Ubuntu preview operations
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Allowed preview operation"
+        required: true
+        type: choice
+        options:
+          - status
+          - inventory
+          - logs
+          - test
+          - deploy-static
+          - rollback
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eduapp-ubuntu-preview-operations
+  cancel-in-progress: false
+
+jobs:
+  operation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - name: Connect to bounded Ubuntu gateway
+        shell: bash
+        env:
+          ACTION: ${{ inputs.action }}
+          COMMIT_SHA: ${{ github.sha }}
+          REF: ${{ github.ref }}
+          HOST: ${{ secrets.UBUNTU_SSH_HOST }}
+          SSH_KEY: ${{ secrets.UBUNTU_SSH_PRIVATE_KEY }}
+          KNOWN_HOSTS: ${{ secrets.UBUNTU_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$HOST" || -z "$SSH_KEY" || -z "$KNOWN_HOSTS" ]]; then
+            echo "Missing SSH GitHub secrets" >&2
+            exit 1
+          fi
+          case "$ACTION" in
+            status|inventory|logs|test|rollback) request="$ACTION" ;;
+            deploy-static)
+              [[ "$REF" == "refs/heads/main" ]] || { echo "Deploy only allowed from main" >&2; exit 2; }
+              [[ "$COMMIT_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 2
+              request="deploy-static $COMMIT_SHA"
+              ;;
+            *) echo "Denied action" >&2; exit 2 ;;
+          esac
+          install -d -m 700 "$HOME/.ssh"
+          trap 'rm -f "$HOME/.ssh/eduapp_key"' EXIT
+          printf '%s\n' "$SSH_KEY" > "$HOME/.ssh/eduapp_key"
+          chmod 600 "$HOME/.ssh/eduapp_key"
+          printf '%s\n' "$KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+          ssh -T -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o IdentitiesOnly=yes -o ConnectTimeout=12 \
+            -i "$HOME/.ssh/eduapp_key" -p 2233 \
+            "eduappbot@$HOST" "$request"
