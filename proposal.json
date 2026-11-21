@@ -1,0 +1,1078 @@
+{
+  "schema_version": "1.0",
+  "title": "پلتفرم آموزشی چندمستأجری eduapp",
+  "project_slug": "eduapp",
+  "source_repo": "ostaddehdari/eduapp",
+  "control_repo": "ostaddehdari/deployment-center",
+  "sources_reviewed": [
+    {
+      "type": "attachment",
+      "description": "EduSaaS_Engineering_Blueprint_v2.0 (1).docx؛ نسخه ۲٫۰، پیوست همین درخواست"
+    },
+    {
+      "type": "repository",
+      "description": "README.md مخزن eduapp در شاخه main پیش از پاک‌سازی؛ پل Ubuntu و preview ایستا"
+    },
+    {
+      "type": "chat",
+      "description": "درخواست تکمیل معماری/امنیت/دیتابیس/کیفیت و سپس پاک‌سازی محتوای موجود مخزن"
+    },
+    {
+      "type": "official_docs",
+      "description": "PostgreSQL RLS و OWASP ASVS و OWASP Multi Tenant Security Cheat Sheet؛ URLها در proposal.md"
+    }
+  ],
+  "facts": [
+    "مخزن هدف عمومی است و مالک ostaddehdari است.",
+    "کارفرما خواست همه محتوای فعلی مخزن پاک و ساخت پروژه از نو آغاز شود.",
+    "فایل مبنا Backend مستقل NestJS، PostgreSQL، Nuxt و React و جداسازی Tenant را مطرح کرده است.",
+    "فایل HAR و بسته Starter Engineering Pack ذکرشده در سند مبنا در این درخواست در دسترس نبودند."
+  ],
+  "assumptions": [
+    "تعداد سرویس‌های runtime، Redis و RabbitMQ تا تصمیم ADR در Sprint 0 پیشنهادند، نه زیرساخت مستقر.",
+    "RPO/RTO و SLO اهداف پایلوت‌اند و نیاز به آزمون و بودجه دارند.",
+    "مدت retention و سیاست داده کودک تا بررسی حقوقی/قراردادی نامشخص‌اند.",
+    "مخزن فقط حاوی اسناد آغاز طراحی است؛ هنوز هیچ backend/front-end تولیدی ساخته نشده است."
+  ],
+  "open_questions": [
+    "مبنای پردازش، محل نگهداری و حذف داده کودک و رضایت سرپرست چیست؟",
+    "ظرفیت واقعی pilot، هزینه مجاز و آستانه SLA چیست؟",
+    "کدام ارائه‌دهندگان درگاه، پیامک و storage قرارداد و sandbox معتبر دارند؟",
+    "دامنه/سرور محصول جدید و نحوه جمع‌کردن preview قدیمی چیست؟",
+    "سامانه مالی مدرسه چه API و مجوز دسترسی دارد؟",
+    "مالکیت تجاری دامنه/سایت و شرایط واگذاری چیست؟"
+  ],
+  "problem": "ساخت سکوی SaaS برای مدیریت سازمان، اشتراک پلتفرم، سایت، مدرسه و حضور با جداسازی کامل اطلاعات مشتریان و کودکان.",
+  "objectives": [
+    {
+      "id": "OBJ-001",
+      "description": "سفر انتهابه‌انتها از ایجاد Tenant تا اعلان غیبت",
+      "measure": "اجرای موفق در staging با دو Tenant، پرداخت و رویداد تکراری، و ثبت زمان گام‌ها"
+    },
+    {
+      "id": "OBJ-002",
+      "description": "جداسازی و حریم خصوصی",
+      "measure": "صفر نشت در تست منفی API/DB/cache/queue/file/export و تست پذیرش با سرپرست چندفرزندی"
+    }
+  ],
+  "actors": [
+    {
+      "id": "ACT-001",
+      "name": "مالک پلتفرم",
+      "permissions": [
+        "tenant:create",
+        "plans:manage",
+        "billing:review"
+      ]
+    },
+    {
+      "id": "ACT-002",
+      "name": "مدیر Tenant یا مجموعه",
+      "permissions": [
+        "org:manage-scoped",
+        "memberships:invite-scoped",
+        "site:delegate-scoped"
+      ]
+    },
+    {
+      "id": "ACT-003",
+      "name": "مدیر مدرسه/معاون",
+      "permissions": [
+        "school:manage-scoped",
+        "attendance:confirm-scoped"
+      ]
+    },
+    {
+      "id": "ACT-004",
+      "name": "معلم",
+      "permissions": [
+        "attendance:write-assigned-class"
+      ]
+    },
+    {
+      "id": "ACT-005",
+      "name": "سرپرست/دانش‌آموز",
+      "permissions": [
+        "student:read-verified-related"
+      ]
+    },
+    {
+      "id": "ACT-006",
+      "name": "مدیر سایت تفویضی",
+      "permissions": [
+        "site:edit-delegated-expiring"
+      ]
+    },
+    {
+      "id": "ACT-007",
+      "name": "سرویس/دستگاه",
+      "permissions": [
+        "event:ingest-scoped"
+      ]
+    }
+  ],
+  "scope": {
+    "mvp": [
+      "P0: FR-001..009",
+      "P1 برای تکمیل نسخه اول: FR-010..014"
+    ],
+    "later": [
+      "FR-015 مشروط به API سامانه مالی",
+      "کلاس زنده/آزمون/فروشگاه/AI بر مبنای بازار و قرارداد"
+    ],
+    "out_of_scope": [
+      "حسابداری و حقوق مدرسه در نسخه اول",
+      "ذخیره template بیومتریک خام",
+      "پیام‌رسان فاقد API معتبر",
+      "تضمین MCI یا SnappPay پیش از POC"
+    ]
+  },
+  "requirements": [
+    {
+      "id": "FR-001",
+      "title": "ورود با رمز/OTP، انتخاب عضویت و چرخه نشست",
+      "priority": "Must",
+      "phase": "P0",
+      "description": "ورود با رمز/OTP، انتخاب عضویت و چرخه نشست → context معتبر",
+      "acceptance_criteria": [
+        "ورود تکراری و OTP منقضی رد؛ refresh تکراری نشست را باطل می‌کند؛ تغییر Tenant مستلزم عضویت فعال است."
+      ],
+      "error_behavior": "پاسخ استاندارد بدون افشای داده؛ جزئیات خطا و وضعیت در proposal.md بخش ۴ و ۷"
+    },
+    {
+      "id": "FR-002",
+      "title": "نقش، scope، رابطه سرپرستی، entitlement",
+      "priority": "Must",
+      "phase": "P0",
+      "description": "نقش، scope، رابطه سرپرستی، entitlement → تصمیم دسترسی",
+      "acceptance_criteria": [
+        "کاربر Tenant A و مدیر شعبه A با شناسه B هر دو رد شوند؛ مجوز و پلن هر دو مستقل بررسی شوند."
+      ],
+      "error_behavior": "پاسخ استاندارد بدون افشای داده؛ جزئیات خطا و وضعیت در proposal.md بخش ۴ و ۷"
+    },
+    {
+      "id": "FR-003",
+      "title": "ایجاد Tenant و جابه‌جایی org unit",
+      "priority": "Must",
+      "phase": "P0",
+      "description": "ایجاد Tenant و جابه‌جایی org unit → درخت نسخه‌دار",
+      "acceptance_criteria": [
+        "parent خارج Tenant، چرخه، و تکرار کد در یک parent رد؛ مدرسه بدون شعبه و شعبه‌دار پشتیبانی شود."
+      ],
+      "error_behavior": "پاسخ استاندارد بدون افشای داده؛ جزئیات خطا و وضعیت در proposal.md بخش ۴ و ۷"
+    },
+    {
+      "id": "FR-004",
+      "title": "دعوت/عضویت چندسازمانی",
+      "priority": "Must",
+      "phase": "P0",
+      "description": "دعوت/عضویت چندسازمانی → نقش فعال در محدوده",
+      "acceptance_criteria": [
+        "یک شخص در دو Tenant نقش متفاوت دارد و تغییر context به هیچ وجه مجوز قبلی را حمل نمی‌کند."
+      ],
+      "error_behavior": "پاسخ استاندارد بدون افشای داده؛ جزئیات خطا و وضعیت در proposal.md بخش ۴ و ۷"
+    },
+    {
+      "id": "FR-005",
+      "title": "تعریف/ثبت فیلد سفارشی",
+      "priority": "Must",
+      "phase": "P0",
+      "description": "تعریف/ثبت فیلد سفارشی → مقدار اعتبارسنجی‌شده",
+      "acceptance_criteria": [
+        "کلید رزروشده و JavaScript رد؛ تغییر schema نسخه جدید دارد؛ مقدار قبلی قابل خواندن و ممیزی است."
+      ],
+      "error_behavior": "پاسخ استاندارد بدون افشای داده؛ جزئیات خطا و وضعیت در proposal.md بخش ۴ و ۷"
+    },
+    {
+      "id": "FR-006",
+      "title": "پلن، صورتحساب، تلاش پرداخت و وب‌هوک",
+      "priority": "Must",
+      "phase": "P0",
+      "description": "پلن، صورتحساب، تلاش پرداخت و وب‌هوک → entitlement",
+      "acceptance_criteria": [
+        "وب‌هوک با امضا/استعلام معتبر فعال می‌کند؛ پنج تکرار فقط یک پرداخت و یک تخصیص ثبت می‌کند."
+      ],
+      "error_behavior": "پاسخ استاندارد بدون افشای داده؛ جزئیات خطا و وضعیت در proposal.md بخش ۴ و ۷"
+    },
+    {
+      "id": "FR-007",
+      "title": "قرارداد واگذاری مدیریت",
+      "priority": "Must",
+      "phase": "P0",
+      "description": "قرارداد واگذاری مدیریت → grant محدود",
+      "acceptance_criteria": [
+        "مالک محدوده را تأیید کند؛ انقضا/لغو فوراً اثر کند؛ مالکیت داده و پرداخت‌کننده تغییر نکند."
+      ],
+      "error_behavior": "پاسخ استاندارد بدون افشای داده؛ جزئیات خطا و وضعیت در proposal.md بخش ۴ و ۷"
+    },
+    {
+      "id": "FR-008",
+      "title": "upload session و تکمیل",
+      "priority": "Must",
+      "phase": "P0",
+      "description": "upload session و تکمیل → asset خصوصی",
+      "acceptance_criteria": [
+        "quota، hash، MIME و اسکن معتبر؛ فایل خصوصی از URL عمومی CDN قابل خواندن نباشد."
+      ],
+      "error_behavior": "پاسخ استاندارد بدون افشای داده؛ جزئیات خطا و وضعیت در proposal.md بخش ۴ و ۷"
+    },
+    {
+      "id": "FR-009",
+      "title": "ایجاد سایت/زیردامنه و اثبات دامنه",
+      "priority": "Must",
+      "phase": "P0",
+      "description": "ایجاد سایت/زیردامنه و اثبات دامنه → host فعال",
+      "acceptance_criteria": [
+        "نام دامنه بدون اثبات مالکیت فعال نشود؛ Host دست‌کاری‌شده Tenant را عوض نکند."
+      ],
+      "error_behavior": "پاسخ استاندارد بدون افشای داده؛ جزئیات خطا و وضعیت در proposal.md بخش ۴ و ۷"
+    },
+    {
+      "id": "FR-010",
+      "title": "JSON draft و publish",
+      "priority": "Must",
+      "phase": "P1",
+      "description": "JSON draft و publish → revision immutable و سایت Nuxt",
+      "acceptance_criteria": [
+        "داده خارج schema/اسکریپت رد؛ انتشار نسخه‌دار و rollback سالم؛ تعارض ویرایش همزمان `409`."
+      ],
+      "error_behavior": "پاسخ استاندارد بدون افشای داده؛ جزئیات خطا و وضعیت در proposal.md بخش ۴ و ۷"
+    },
+    {
+      "id": "FR-011",
+      "title": "سال/کلاس/معلم/دانش‌آموز/ثبت‌نام",
+      "priority": "Must",
+      "phase": "P1",
+      "description": "سال/کلاس/معلم/دانش‌آموز/ثبت‌نام → تاریخچه سالانه",
+      "acceptance_criteria": [
+        "کلاس به همان مدرسه/سال متعلق باشد؛ انتقال سال، پرونده و سابقه پیشین را حذف نکند."
+      ],
+      "error_behavior": "پاسخ استاندارد بدون افشای داده؛ جزئیات خطا و وضعیت در proposal.md بخش ۴ و ۷"
+    },
+    {
+      "id": "FR-012",
+      "title": "رابطه سرپرستی تأییدشده",
+      "priority": "Must",
+      "phase": "P1",
+      "description": "رابطه سرپرستی تأییدشده → دیدن فرزند",
+      "acceptance_criteria": [
+        "سرپرست فقط فرزند پیوندخورده و فیلد مجاز را ببیند؛ رابطه لغوشده فوراً رد شود."
+      ],
+      "error_behavior": "پاسخ استاندارد بدون افشای داده؛ جزئیات خطا و وضعیت در proposal.md بخش ۴ و ۷"
+    },
+    {
+      "id": "FR-013",
+      "title": "ثبت گروهی معلم/رویداد دستگاه",
+      "priority": "Must",
+      "phase": "P1",
+      "description": "ثبت گروهی معلم/رویداد دستگاه → حضور موقت/تأییدشده",
+      "acceptance_criteria": [
+        "معلم غیرمنتسب رد؛ `(tenant,device,external_event)` یکتا؛ تردد گیت، حضور کلاس محسوب نشود."
+      ],
+      "error_behavior": "پاسخ استاندارد بدون افشای داده؛ جزئیات خطا و وضعیت در proposal.md بخش ۴ و ۷"
+    },
+    {
+      "id": "FR-014",
+      "title": "حضور تأییدشده و rule",
+      "priority": "Must",
+      "phase": "P1",
+      "description": "حضور تأییدشده و rule → job و receipt",
+      "acceptance_criteria": [
+        "قبل از تأیید طبق سیاست صفر پیام؛ retry و تکرار event فقط یک اعلان منطقی؛ سکوت زمانی رعایت شود."
+      ],
+      "error_behavior": "پاسخ استاندارد بدون افشای داده؛ جزئیات خطا و وضعیت در proposal.md بخش ۴ و ۷"
+    },
+    {
+      "id": "FR-015",
+      "title": "داده مالی خارجی",
+      "priority": "Should",
+      "phase": "P1",
+      "description": "داده مالی خارجی → snapshot فقط خواندنی",
+      "acceptance_criteria": [
+        "منشأ و `last_synced_at` نمایش داده شود؛ خطای sync به تغییر مانده یا وصول محلی منجر نشود."
+      ],
+      "error_behavior": "پاسخ استاندارد بدون افشای داده؛ جزئیات خطا و وضعیت در proposal.md بخش ۴ و ۷"
+    }
+  ],
+  "nonfunctional_requirements": [
+    {
+      "id": "NFR-001",
+      "title": "جداسازی و تحمل بار در staging",
+      "priority": "Must",
+      "phase": "cross-cutting",
+      "description": "جداسازی و تحمل بار در staging",
+      "acceptance_criteria": [
+        "تست Tenant A/B در API، DB، cache، queue، فایل و export صفر نشت؛ پروفایل بار ۱۰۰/۵۰۰/۱۰۰۰ کاربر همزمان با داده پایلوت گزارش شود."
+      ],
+      "error_behavior": "پاسخ استاندارد بدون افشای داده؛ جزئیات خطا و وضعیت در proposal.md بخش ۴ و ۷"
+    },
+    {
+      "id": "NFR-002",
+      "title": "دسترس‌پذیری و تأخیر هدف پایلوت",
+      "priority": "Should",
+      "phase": "cross-cutting",
+      "description": "دسترس‌پذیری و تأخیر هدف پایلوت",
+      "acceptance_criteria": [
+        "هدف اولیه API هسته ۹۹٫۹٪ ماهانه، خواندن رایج p95 < ۴۰۰ms و پذیرش حضور p95 < ۷۰۰ms **فقط زیر بار تعریف‌شده و خارج از زمان provider**؛ سنجه واقعی و هزینه قبل از SLA تصویب شود."
+      ],
+      "error_behavior": "پاسخ استاندارد بدون افشای داده؛ جزئیات خطا و وضعیت در proposal.md بخش ۴ و ۷"
+    },
+    {
+      "id": "NFR-003",
+      "title": "فارسی/RTL و دسترس‌پذیری",
+      "priority": "Must",
+      "phase": "cross-cutting",
+      "description": "فارسی/RTL و دسترس‌پذیری",
+      "acceptance_criteria": [
+        "تاریخ UTC در API، نمایش جلالی در UI، کیبورد و فوکوس در مسیرهای اصلی و بررسی WCAG 2.2 AA متناسب با وب."
+      ],
+      "error_behavior": "پاسخ استاندارد بدون افشای داده؛ جزئیات خطا و وضعیت در proposal.md بخش ۴ و ۷"
+    },
+    {
+      "id": "SEC-001",
+      "title": "مجوز شیءمحور و انکار پیش‌فرض",
+      "priority": "Must",
+      "phase": "cross-cutting",
+      "description": "مجوز شیءمحور و انکار پیش‌فرض",
+      "acceptance_criteria": [
+        "ماتریس نقش × عمل × شیء × scope × entitlement با سناریوهای منفی خودکار؛ هیچ شناسه‌ای از Header/URL بدون اعتبارسنجی مالکیت پذیرفته نشود."
+      ],
+      "error_behavior": "پاسخ استاندارد بدون افشای داده؛ جزئیات خطا و وضعیت در proposal.md بخش ۴ و ۷"
+    },
+    {
+      "id": "SEC-002",
+      "title": "هویت، نشست و حریم خصوصی کودکان",
+      "priority": "Must",
+      "phase": "cross-cutting",
+      "description": "هویت، نشست و حریم خصوصی کودکان",
+      "acceptance_criteria": [
+        "MFA مدیر حساس، revoke/rotation نشست، ثبت رضایت و حداقل داده؛ هیچ الگوی بیومتریک خام در SaaS نگهداری نشود."
+      ],
+      "error_behavior": "پاسخ استاندارد بدون افشای داده؛ جزئیات خطا و وضعیت در proposal.md بخش ۴ و ۷"
+    },
+    {
+      "id": "SEC-003",
+      "title": "کنترل ورودی، فایل، خروجی و اسرار",
+      "priority": "Must",
+      "phase": "cross-cutting",
+      "description": "کنترل ورودی، فایل، خروجی و اسرار",
+      "acceptance_criteria": [
+        "اسکن وابستگی و secret، CSRF کوکی، XSS/CSP، SSRF allowlist، MIME/size/scan، TLS؛ تست سوءاستفاده‌های بحرانی سبز."
+      ],
+      "error_behavior": "پاسخ استاندارد بدون افشای داده؛ جزئیات خطا و وضعیت در proposal.md بخش ۴ و ۷"
+    },
+    {
+      "id": "DATA-001",
+      "title": "مدل مالکیت و سازگاری",
+      "priority": "Must",
+      "phase": "cross-cutting",
+      "description": "مدل مالکیت و سازگاری",
+      "acceptance_criteria": [
+        "`tenant_id NOT NULL` روی جدول Tenant-owned، FK مرکب در DB مشترک، migration/RLS و تست pooling؛ تراکنش مالی idempotent."
+      ],
+      "error_behavior": "پاسخ استاندارد بدون افشای داده؛ جزئیات خطا و وضعیت در proposal.md بخش ۴ و ۷"
+    },
+    {
+      "id": "DATA-002",
+      "title": "پشتیبان/حذف/بازیابی",
+      "priority": "Must",
+      "phase": "cross-cutting",
+      "description": "پشتیبان/حذف/بازیابی",
+      "acceptance_criteria": [
+        "بازیابی در staging آزموده و RPO/RTO ثبت شود؛ برنامه حذف/retention فایل، DB، backup و audit قبل از تولید تصویب شود."
+      ],
+      "error_behavior": "پاسخ استاندارد بدون افشای داده؛ جزئیات خطا و وضعیت در proposal.md بخش ۴ و ۷"
+    },
+    {
+      "id": "OPS-001",
+      "title": "CI و تحویل",
+      "priority": "Must",
+      "phase": "cross-cutting",
+      "description": "CI و تحویل",
+      "acceptance_criteria": [
+        "format/lint/typecheck/unit/integration/contract/security/build همگی سبز و artefact امضاشده/قابل ردیابی؛ staging و rollback آزمایش شده."
+      ],
+      "error_behavior": "پاسخ استاندارد بدون افشای داده؛ جزئیات خطا و وضعیت در proposal.md بخش ۴ و ۷"
+    },
+    {
+      "id": "OPS-002",
+      "title": "مشاهده‌پذیری و تفکیک محیط",
+      "priority": "Must",
+      "phase": "cross-cutting",
+      "description": "مشاهده‌پذیری و تفکیک محیط",
+      "acceptance_criteria": [
+        "trace/request ID، metrics، health/readiness، لاگ بدون PII، secret جدا برای dev/staging/prod و هشدار خطای پرداخت/queue."
+      ],
+      "error_behavior": "پاسخ استاندارد بدون افشای داده؛ جزئیات خطا و وضعیت در proposal.md بخش ۴ و ۷"
+    }
+  ],
+  "data_entities": [
+    {
+      "name": "tenants",
+      "owner": "tenancy",
+      "fields": [
+        "id uuid PK",
+        "slug text UNIQUE NOT NULL",
+        "status text CHECK",
+        "deleted_at timestamptz NULL"
+      ],
+      "constraints": [
+        "نگهداری بر اساس قرارداد و درخواست حذف؛ وضعیت تعلیق بدون حذف خودکار."
+      ],
+      "relationships": [
+        "طبق ERD و FK مرکب در proposal.md بخش ۶"
+      ],
+      "retention_pii": "نگهداری بر اساس قرارداد و درخواست حذف؛ وضعیت تعلیق بدون حذف خودکار."
+    },
+    {
+      "name": "org_units",
+      "owner": "tenancy",
+      "fields": [
+        "id uuid PK",
+        "tenant_id uuid FK",
+        "parent_id uuid NULL",
+        "kind text CHECK",
+        "code text NOT NULL"
+      ],
+      "constraints": [
+        "FK `(tenant_id,parent_id)` به `(tenant_id,id)`؛ unique کد در parent و root partial unique؛ جابه‌جایی بدون چرخه؛ `(tenant_id,parent_id)` index."
+      ],
+      "relationships": [
+        "طبق ERD و FK مرکب در proposal.md بخش ۶"
+      ],
+      "retention_pii": "FK `(tenant_id,parent_id)` به `(tenant_id,id)`؛ unique کد در parent و root partial unique؛ جابه‌جایی بدون چرخه؛ `(tenant_id,parent_id)` index."
+    },
+    {
+      "name": "identities",
+      "owner": "iam",
+      "fields": [
+        "id uuid PK",
+        "login_normalized text UNIQUE",
+        "status text"
+      ],
+      "constraints": [
+        "شناسه ورود/تماس PII؛ از `persons` جدا؛ لاگین بدون جست‌وجوی Tenant آزاد."
+      ],
+      "relationships": [
+        "طبق ERD و FK مرکب در proposal.md بخش ۶"
+      ],
+      "retention_pii": "شناسه ورود/تماس PII؛ از `persons` جدا؛ لاگین بدون جست‌وجوی Tenant آزاد."
+    },
+    {
+      "name": "sessions",
+      "owner": "iam",
+      "fields": [
+        "id uuid PK",
+        "identity_id uuid FK",
+        "refresh_hash text",
+        "expires_at timestamptz",
+        "revoked_at timestamptz NULL"
+      ],
+      "constraints": [
+        "فقط hash توکن؛ index `(identity_id,expires_at)`؛ purge پس از TTL/سیاست."
+      ],
+      "relationships": [
+        "طبق ERD و FK مرکب در proposal.md بخش ۶"
+      ],
+      "retention_pii": "فقط hash توکن؛ index `(identity_id,expires_at)`؛ purge پس از TTL/سیاست."
+    },
+    {
+      "name": "persons",
+      "owner": "people",
+      "fields": [
+        "id uuid PK",
+        "tenant_id uuid FK",
+        "identity_id uuid NULL",
+        "display_name text"
+      ],
+      "constraints": [
+        "داده کودک/سرپرست حساس؛ هویت سراسری به اشتراک داده بین Tenant منجر نشود؛ lookup با `tenant_id`."
+      ],
+      "relationships": [
+        "طبق ERD و FK مرکب در proposal.md بخش ۶"
+      ],
+      "retention_pii": "داده کودک/سرپرست حساس؛ هویت سراسری به اشتراک داده بین Tenant منجر نشود؛ lookup با `tenant_id`."
+    },
+    {
+      "name": "memberships",
+      "owner": "access",
+      "fields": [
+        "id uuid PK",
+        "tenant_id uuid FK",
+        "identity_id uuid FK",
+        "org_unit_id uuid NULL",
+        "status text",
+        "expires_at timestamptz NULL"
+      ],
+      "constraints": [
+        "unique فعال برای هویت/محدوده/نوع عضویت؛ `(tenant_id,identity_id,status)`؛ مجوز زمینه‌ای."
+      ],
+      "relationships": [
+        "طبق ERD و FK مرکب در proposal.md بخش ۶"
+      ],
+      "retention_pii": "unique فعال برای هویت/محدوده/نوع عضویت؛ `(tenant_id,identity_id,status)`؛ مجوز زمینه‌ای."
+    },
+    {
+      "name": "roles و role_bindings",
+      "owner": "access",
+      "fields": [
+        "id",
+        "tenant_id",
+        "name",
+        "version",
+        "id",
+        "tenant_id",
+        "membership_id",
+        "role_id",
+        "scope_org_id",
+        "expires_at"
+      ],
+      "constraints": [
+        "FKهای مرکب Tenant؛ deny precedence و history نقش؛ شناسه role به‌تنهایی مجوز نیست."
+      ],
+      "relationships": [
+        "طبق ERD و FK مرکب در proposal.md بخش ۶"
+      ],
+      "retention_pii": "FKهای مرکب Tenant؛ deny precedence و history نقش؛ شناسه role به‌تنهایی مجوز نیست."
+    },
+    {
+      "name": "field_definitions و field_values",
+      "owner": "fields",
+      "fields": [
+        "id",
+        "tenant_id",
+        "entity_type",
+        "key",
+        "schema_version",
+        "sensitivity",
+        "tenant_id",
+        "entity_id",
+        "definition_id",
+        "value_jsonb"
+      ],
+      "constraints": [
+        "unique `(tenant_id,entity_type,key,schema_version)` و `(tenant_id,entity_id,definition_id)`؛ PII طبقه‌بندی‌شده، حجم/عمق JSON محدود."
+      ],
+      "relationships": [
+        "طبق ERD و FK مرکب در proposal.md بخش ۶"
+      ],
+      "retention_pii": "unique `(tenant_id,entity_type,key,schema_version)` و `(tenant_id,entity_id,definition_id)`؛ PII طبقه‌بندی‌شده، حجم/عمق JSON محدود."
+    },
+    {
+      "name": "plans, plan_versions, entitlements",
+      "owner": "billing",
+      "fields": [
+        "id",
+        "code",
+        "id",
+        "plan_id",
+        "price_minor bigint",
+        "currency",
+        "effective_at",
+        "id",
+        "tenant_id",
+        "feature",
+        "limit_value",
+        "valid_to"
+      ],
+      "constraints": [
+        "catalog version immutable؛ entitlement منبع تصمیم بلادرنگ؛ index `(tenant_id,feature,valid_to)`."
+      ],
+      "relationships": [
+        "طبق ERD و FK مرکب در proposal.md بخش ۶"
+      ],
+      "retention_pii": "catalog version immutable؛ entitlement منبع تصمیم بلادرنگ؛ index `(tenant_id,feature,valid_to)`."
+    },
+    {
+      "name": "subscriptions, invoices",
+      "owner": "billing",
+      "fields": [
+        "id",
+        "tenant_id",
+        "plan_version_id",
+        "status",
+        "id",
+        "tenant_id",
+        "subscription_id",
+        "amount_minor bigint",
+        "currency",
+        "status"
+      ],
+      "constraints": [
+        "شماره فاکتور unique در قلمرو قانونی/تجاری مصوب؛ عدد صحیح کوچک‌ترین واحد ارز."
+      ],
+      "relationships": [
+        "طبق ERD و FK مرکب در proposal.md بخش ۶"
+      ],
+      "retention_pii": "شماره فاکتور unique در قلمرو قانونی/تجاری مصوب؛ عدد صحیح کوچک‌ترین واحد ارز."
+    },
+    {
+      "name": "payment_attempts, provider_events, ledger_entries",
+      "owner": "billing",
+      "fields": [
+        "id",
+        "tenant_id",
+        "invoice_id",
+        "idempotency_key",
+        "provider",
+        "provider_event_id",
+        "payload_hash",
+        "id",
+        "tenant_id",
+        "invoice_id",
+        "direction",
+        "amount_minor"
+      ],
+      "constraints": [
+        "unique `(tenant_id,idempotency_key)` و `(provider,provider_event_id)`؛ ledger append-only و reconciliation؛ گزارش بدون شماره کارت."
+      ],
+      "relationships": [
+        "طبق ERD و FK مرکب در proposal.md بخش ۶"
+      ],
+      "retention_pii": "unique `(tenant_id,idempotency_key)` و `(provider,provider_event_id)`؛ ledger append-only و reconciliation؛ گزارش بدون شماره کارت."
+    },
+    {
+      "name": "sites, domains, page_revisions",
+      "owner": "sites",
+      "fields": [
+        "id",
+        "tenant_id",
+        "org_unit_id",
+        "id",
+        "host_normalized",
+        "proof_status",
+        "id",
+        "site_id",
+        "schema_version",
+        "document_jsonb",
+        "published_at"
+      ],
+      "constraints": [
+        "host verified globally unique؛ revision immutable؛ index `(tenant_id,site_id,published_at)`؛ محتوای عمومی جدا از PII."
+      ],
+      "relationships": [
+        "طبق ERD و FK مرکب در proposal.md بخش ۶"
+      ],
+      "retention_pii": "host verified globally unique؛ revision immutable؛ index `(tenant_id,site_id,published_at)`؛ محتوای عمومی جدا از PII."
+    },
+    {
+      "name": "media_assets, upload_sessions",
+      "owner": "assets",
+      "fields": [
+        "id",
+        "tenant_id",
+        "object_key",
+        "sha256",
+        "privacy",
+        "scan_status",
+        "size_bytes",
+        "id",
+        "tenant_id",
+        "expires_at",
+        "status"
+      ],
+      "constraints": [
+        "unique `(storage_provider,object_key)`؛ key غیرقابل حدس؛ فایل خصوصی با ACL/signed read؛ حذف در object storage هم پیگیری شود."
+      ],
+      "relationships": [
+        "طبق ERD و FK مرکب در proposal.md بخش ۶"
+      ],
+      "retention_pii": "unique `(storage_provider,object_key)`؛ key غیرقابل حدس؛ فایل خصوصی با ACL/signed read؛ حذف در object storage هم پیگیری شود."
+    },
+    {
+      "name": "schools, academic_years, class_groups",
+      "owner": "school",
+      "fields": [
+        "id",
+        "tenant_id",
+        "org_unit_id",
+        "id",
+        "tenant_id",
+        "school_id",
+        "starts_on",
+        "ends_on",
+        "id",
+        "tenant_id",
+        "school_id",
+        "year_id",
+        "code"
+      ],
+      "constraints": [
+        "FK مرکب برای school/year؛ unique فعال سال در مدرسه؛ `CHECK(starts_on<ends_on)`؛ شاخص `(tenant_id,school_id,year_id)`."
+      ],
+      "relationships": [
+        "طبق ERD و FK مرکب در proposal.md بخش ۶"
+      ],
+      "retention_pii": "FK مرکب برای school/year؛ unique فعال سال در مدرسه؛ `CHECK(starts_on<ends_on)`؛ شاخص `(tenant_id,school_id,year_id)`."
+    },
+    {
+      "name": "enrollments, guardian_links",
+      "owner": "school",
+      "fields": [
+        "id",
+        "tenant_id",
+        "school_id",
+        "year_id",
+        "student_person_id",
+        "status",
+        "id",
+        "tenant_id",
+        "student_person_id",
+        "guardian_person_id",
+        "verified_at",
+        "revoked_at"
+      ],
+      "constraints": [
+        "unique ثبت‌نام فعال متناسب سیاست انتقال؛ index `(tenant_id,student_person_id,year_id)`؛ رابطه سرپرستی با مدارک/رضایت محدود."
+      ],
+      "relationships": [
+        "طبق ERD و FK مرکب در proposal.md بخش ۶"
+      ],
+      "retention_pii": "unique ثبت‌نام فعال متناسب سیاست انتقال؛ index `(tenant_id,student_person_id,year_id)`؛ رابطه سرپرستی با مدارک/رضایت محدود."
+    },
+    {
+      "name": "device_events, attendance_records, attendance_revisions",
+      "owner": "attendance",
+      "fields": [
+        "id",
+        "tenant_id",
+        "device_id",
+        "external_event_id",
+        "occurred_at",
+        "id",
+        "tenant_id",
+        "enrollment_id",
+        "class_session_id",
+        "status",
+        "id",
+        "record_id",
+        "reason",
+        "actor_id"
+      ],
+      "constraints": [
+        "unique `(tenant_id,device_id,external_event_id)` و `(tenant_id,enrollment_id,class_session_id)`؛ revision append-only؛ رویداد دستگاه بدون biometric template."
+      ],
+      "relationships": [
+        "طبق ERD و FK مرکب در proposal.md بخش ۶"
+      ],
+      "retention_pii": "unique `(tenant_id,device_id,external_event_id)` و `(tenant_id,enrollment_id,class_session_id)`؛ revision append-only؛ رویداد دستگاه بدون biometric template."
+    },
+    {
+      "name": "message_jobs, message_attempts",
+      "owner": "notifications",
+      "fields": [
+        "id",
+        "tenant_id",
+        "logical_key",
+        "recipient_ref",
+        "status",
+        "id",
+        "job_id",
+        "provider",
+        "external_ref",
+        "status"
+      ],
+      "constraints": [
+        "unique `(tenant_id,logical_key)`؛ شماره تلفن در لاگ mask؛ TTL متن/رسید مطابق سیاست."
+      ],
+      "relationships": [
+        "طبق ERD و FK مرکب در proposal.md بخش ۶"
+      ],
+      "retention_pii": "unique `(tenant_id,logical_key)`؛ شماره تلفن در لاگ mask؛ TTL متن/رسید مطابق سیاست."
+    },
+    {
+      "name": "outbox_events, inbox_dedup, audit_events",
+      "owner": "platform",
+      "fields": [
+        "id",
+        "tenant_id",
+        "event_type",
+        "payload",
+        "published_at",
+        "consumer",
+        "event_id",
+        "id",
+        "tenant_id",
+        "actor_id",
+        "action",
+        "resource_ref",
+        "occurred_at"
+      ],
+      "constraints": [
+        "unique `(consumer,event_id)`؛ payload حداقلی بدون PII؛ audit append-only/محافظت‌شده؛ retention قراردادی."
+      ],
+      "relationships": [
+        "طبق ERD و FK مرکب در proposal.md بخش ۶"
+      ],
+      "retention_pii": "unique `(consumer,event_id)`؛ payload حداقلی بدون PII؛ audit append-only/محافظت‌شده؛ retention قراردادی."
+    }
+  ],
+  "api_contracts": [
+    {
+      "operations": [
+        "POST /v1/auth/otp/request",
+        "POST /v1/auth/otp/verify",
+        "POST /v1/auth/refresh"
+      ],
+      "auth_request": "عمومی با rate limit؛ challenge و سپس cookie/session",
+      "success_error": "`202/200`؛ پاسخ غیرقابل تشخیص برای شماره ناشناخته؛ `429` تلاش زیاد",
+      "version": "v1",
+      "details_source": "proposal.md بخش ۷"
+    },
+    {
+      "operations": [
+        "GET /v1/me/capabilities"
+      ],
+      "auth_request": "نشست و scope فعال",
+      "success_error": "`200` قابلیت‌ها برای همان Tenant؛ cache با invalidation تغییر نقش",
+      "version": "v1",
+      "details_source": "proposal.md بخش ۷"
+    },
+    {
+      "operations": [
+        "POST /v1/tenants",
+        "POST /v1/org-units",
+        "POST /v1/org-units/{id}/move"
+      ],
+      "auth_request": "platform/tenant-owner + کنترل parent",
+      "success_error": "`201/200`؛ `409` کد تکراری/نسخه یا چرخه",
+      "version": "v1",
+      "details_source": "proposal.md بخش ۷"
+    },
+    {
+      "operations": [
+        "POST /v1/memberships",
+        "POST /v1/role-bindings"
+      ],
+      "auth_request": "مدیر همان scope؛ input identity/role",
+      "success_error": "`201`؛ `403` برای role برتر از اختیار دعوت‌کننده",
+      "version": "v1",
+      "details_source": "proposal.md بخش ۷"
+    },
+    {
+      "operations": [
+        "POST /v1/field-definitions",
+        "PATCH /v1/entities/{type}/{id}/custom-fields"
+      ],
+      "auth_request": "schema owner یا editor شیء",
+      "success_error": "`201/200`؛ `422` نوع/کلید نامعتبر",
+      "version": "v1",
+      "details_source": "proposal.md بخش ۷"
+    },
+    {
+      "operations": [
+        "POST /v1/subscriptions/checkout",
+        "POST /v1/invoices/{id}/payment-attempts"
+      ],
+      "auth_request": "payer و entitlement تجاری؛ idempotency",
+      "success_error": "`201/202`؛ `409` key با payload دیگر؛ هیچ فعال‌سازی با callback تنها",
+      "version": "v1",
+      "details_source": "proposal.md بخش ۷"
+    },
+    {
+      "operations": [
+        "POST /v1/webhooks/payments/{provider}"
+      ],
+      "auth_request": "signature، timestamp و استعلام سمت سرور",
+      "success_error": "`200` برای تکرار سالم؛ `401/400` امضا و payload نامعتبر",
+      "version": "v1",
+      "details_source": "proposal.md بخش ۷"
+    },
+    {
+      "operations": [
+        "POST /v1/assets/upload-sessions",
+        "POST /v1/assets/upload-sessions/{id}/complete"
+      ],
+      "auth_request": "uploader همان Tenant؛ محدودیت فایل",
+      "success_error": "`201/200` پس از verify/scan؛ `413/422` حجم/نوع؛ دسترسی private",
+      "version": "v1",
+      "details_source": "proposal.md بخش ۷"
+    },
+    {
+      "operations": [
+        "POST /v1/sites/{id}/domains",
+        "POST /v1/sites/{id}/pages",
+        "POST /v1/pages/{id}/publish"
+      ],
+      "auth_request": "مالک سایت/ناشر scoped",
+      "success_error": "`201/200`؛ `409` host یا revision؛ انتشار فقط schema معتبر",
+      "version": "v1",
+      "details_source": "proposal.md بخش ۷"
+    },
+    {
+      "operations": [
+        "POST /v1/schools/{id}/academic-years",
+        "POST /v1/enrollments"
+      ],
+      "auth_request": "مدیر مدرسه/اجرایی",
+      "success_error": "`201`؛ `409` سال/ثبت‌نام متعارض",
+      "version": "v1",
+      "details_source": "proposal.md بخش ۷"
+    },
+    {
+      "operations": [
+        "POST /v1/attendance/session-batches",
+        "POST /v1/attendance/records/{id}/confirm"
+      ],
+      "auth_request": "معلم منتسب/تأییدکننده",
+      "success_error": "`202/200`؛ `403` کلاس بی‌انتساب؛ revision/audit",
+      "version": "v1",
+      "details_source": "proposal.md بخش ۷"
+    },
+    {
+      "operations": [
+        "POST /v1/devices/{id}/events",
+        "GET /v1/message-jobs"
+      ],
+      "auth_request": "دستگاه معتبر / مدیر همان scope",
+      "success_error": "`202/200`؛ تکرار رویداد بدون اثر دوم؛ صفحه‌بندی",
+      "version": "v1",
+      "details_source": "proposal.md بخش ۷"
+    }
+  ],
+  "architecture": {
+    "style": "headless-api-first; proposed-modular-monolith-initial-deployment; split-by-bounded-context-when-justified",
+    "rationale": "حفظ مرز دامنه و قراردادهای سرویس با هزینه عملیاتی متناسب با تیم/بار آغاز پروژه؛ گزینه ۸ تا ۱۰ deployment سند مبنا پس از POC",
+    "modules": [
+      "IAM/Access",
+      "Tenant/Organization",
+      "Persons/Fields",
+      "Commercial/Billing",
+      "Sites/Domains/Pages",
+      "Assets",
+      "School/Enrollment",
+      "Attendance",
+      "Notifications/Integrations",
+      "Audit/Jobs"
+    ],
+    "adrs": [
+      {
+        "id": "ADR-001",
+        "decision": "runtime اولیه API ماژولار/worker/Nuxt/React پیشنهاد؛ split پس از سنجه",
+        "alternative": "۸ تا ۱۰ سرویس اولیه فایل مبنا",
+        "cost_effect": "کاهش بار اولیه ops، هزینه احتمالی split در آینده"
+      },
+      {
+        "id": "ADR-002",
+        "decision": "PostgreSQL tenant row isolation + RLS defense in depth",
+        "alternative": "DB per tenant",
+        "cost_effect": "عملیات ساده‌تر و الزام تست سخت RLS"
+      },
+      {
+        "id": "ADR-003",
+        "decision": "transactional outbox/inbox؛ انتخاب broker پس از POC",
+        "alternative": "RabbitMQ طبق فایل مبنا از ابتدا",
+        "cost_effect": "کاهش dependency اولیه، حفظ idempotency"
+      },
+      {
+        "id": "ADR-004",
+        "decision": "NestJS/TS/Nuxt/React ثابت؛ ORM و نسخه‌ها پس از POC",
+        "alternative": "Prisma یا Drizzle",
+        "cost_effect": "هزینه کوتاه‌مدت ارزیابی برای migration/RLS مطمئن"
+      },
+      {
+        "id": "ADR-005",
+        "decision": "entitlement و permission مستقل و مالی مدرسه جدا",
+        "alternative": "ادغام در نقش/حسابداری مدرسه",
+        "cost_effect": "کاهش خطر دسترسی و پیچیدگی مالی اشتباه"
+      }
+    ]
+  },
+  "security": {
+    "threats": [
+      "cross-tenant IDOR/context bleed",
+      "payment/webhook replay",
+      "device impersonation",
+      "private CDN leak",
+      "page-builder XSS/SSRF",
+      "domain takeover",
+      "SMS abuse",
+      "child PII exposure"
+    ],
+    "controls": [
+      "least privilege and object authorization",
+      "RLS/FK/composite key + pool tests",
+      "MFA admin and session rotation",
+      "verified webhooks + append-only ledger",
+      "strict JSON registry + upload scan",
+      "signed private URL",
+      "redacted audit logs",
+      "CSRF/CSP/CORS/TLS",
+      "dependency and secret scanning"
+    ],
+    "data_classification": "public/internal/confidential/highly-sensitive; children/guardian/health data require policy and legal review"
+  },
+  "engineering": {
+    "code_quality": [
+      "TypeScript strict; runtime DTO validation",
+      "domain-boundary imports; controllers thin; owner repositories",
+      "format/lint/typecheck and review",
+      "pinned lockfile and ADR for decisions"
+    ],
+    "testing": [
+      "unit business rules",
+      "PostgreSQL integration including RLS/pooling/migration",
+      "OpenAPI and AsyncAPI contract",
+      "end-to-end two tenants/payment replay/attendance dedupe",
+      "staging restore and rollback drill"
+    ],
+    "ci_cd": [
+      "format",
+      "lint",
+      "typecheck",
+      "unit",
+      "integration",
+      "contract-diff",
+      "security-scan",
+      "build",
+      "staging-E2E",
+      "release-review"
+    ]
+  },
+  "deployment": {
+    "server": null,
+    "domain": null,
+    "base_path": null,
+    "environment": "staging-first",
+    "notes": [
+      "dev/staging/prod isolation",
+      "old preview deployment is not the new product runtime",
+      "production only after approval, real rollback and provider POC"
+    ]
+  },
+  "risks": [
+    {
+      "risk": "نشت داده بین Tenant",
+      "severity": "critical",
+      "mitigation": "دو Tenant، RLS/FK، کنترل شیء و تست منفی تمام مرزها"
+    },
+    {
+      "risk": "پرداخت یا اعلان تکراری",
+      "severity": "critical",
+      "mitigation": "استعلام سرور، unique provider reference، outbox/inbox و reconciliation"
+    },
+    {
+      "risk": "Provider بدون قرارداد",
+      "severity": "high",
+      "mitigation": "قرارداد/POC پیش از تعهد"
+    },
+    {
+      "risk": "ریسک حقوقی داده کودک",
+      "severity": "high",
+      "mitigation": "بررسی حقوقی، consent و retention پیش از تولید"
+    },
+    {
+      "risk": "میکروسرویس زودهنگام",
+      "severity": "high",
+      "mitigation": "ADR-001 با سنجه بار/هزینه/تیم"
+    }
+  ],
+  "definition_of_done": [
+    "شناسه الزام و معیار پذیرش آزموده شده",
+    "migration/index/RLS و rollback تأیید شده",
+    "OpenAPI/SDK و نسخه قرارداد به‌روز",
+    "تست منفی و امنیتی دو Tenant سبز",
+    "logs بدون PII و runbook/alerts موجود",
+    "PR review و CI و staging پذیرش شده"
+  ]
+}
