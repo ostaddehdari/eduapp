@@ -1,0 +1,81 @@
+{
+  "schema_version": "1.0",
+  "decision_id": "ADR-0001",
+  "version": "1.0.0",
+  "status": "accepted",
+  "approved_at": "2026-11-22",
+  "owner": "Product Architecture",
+  "sources": [
+    {
+      "id": "engineering-2.1",
+      "title": "EduSaaS Engineering Proposal 2.1",
+      "authority": "p0_p1_and_architecture",
+      "raw_evidence_available": true,
+      "may_define_api": true
+    },
+    {
+      "id": "comprehensive-proposal",
+      "title": "Comprehensive Educational Platform Proposal",
+      "authority": "p2_p3_capability_coverage",
+      "raw_evidence_available": true,
+      "may_define_api": false
+    },
+    {
+      "id": "har-v1.1",
+      "title": "HAR-derived Proposal 1.1",
+      "authority": "evidence_only",
+      "raw_evidence_available": false,
+      "may_define_api": false
+    }
+  ],
+  "priority_order": ["P0", "P1", "P2", "P3"],
+  "priorities": {
+    "P0": {
+      "commitment": "commercial_mvp",
+      "requirements": ["FR-001", "FR-002", "FR-003", "FR-004", "FR-005", "FR-006", "FR-007", "FR-008", "FR-009"],
+      "capabilities": ["identity", "tenant-organization", "access-control", "custom-fields", "billing-entitlements", "private-assets", "site-registry"],
+      "exit_gate": "two_tenants_isolated_and_core_security_tests_green"
+    },
+    "P1": {
+      "commitment": "first_full_release",
+      "requirements": ["FR-010", "FR-011", "FR-012", "FR-013", "FR-014", "FR-015"],
+      "capabilities": ["page-builder", "school-core", "enrollment-guardians", "attendance", "notifications", "read-only-finance-integration"],
+      "exit_gate": "staging_pilot_rollback_and_restore_green"
+    },
+    "P2": {
+      "commitment": "conditional_expansion",
+      "requirements": [],
+      "capabilities": ["lms", "assignments", "grading-exams", "live-classes", "courses-events", "crm", "store", "contracts-hr", "report-builder"],
+      "exit_gate": "validated_demand_budget_and_provider_contracts"
+    },
+    "P3": {
+      "commitment": "separate_business_case",
+      "requirements": [],
+      "capabilities": ["full-accounting", "payroll", "wallet-cafeteria", "advanced-transport", "predictive-bi", "omr", "sensitive-ai"],
+      "exit_gate": "independent_adr_roi_legal_review_and_pilot"
+    }
+  },
+  "conflict_resolution": {
+    "p0_p1_authority": "engineering-2.1",
+    "p2_p3_coverage": "comprehensive-proposal",
+    "har_role": "evidence_only",
+    "har_observation_is_contract": false,
+    "priority_change_requires": ["version_bump", "reason", "api_data_impact", "reviewed_pull_request"]
+  },
+  "commercial_rules": {
+    "p0_may_promise": ["P0"],
+    "p1_requires_independent_gate": true,
+    "p2_p3_are_mvp_commitments": false
+  },
+  "tenant_boundary": {
+    "subject_id": "person-001",
+    "memberships": [
+      {"tenant_id": "tenant-a", "role": "owner", "active": true},
+      {"tenant_id": "tenant-b", "role": "teacher", "active": true}
+    ],
+    "requested_contexts": ["tenant-a", "tenant-b"],
+    "forbidden_context": "tenant-c",
+    "cross_tenant_role_carry_over": false,
+    "error_code": "TENANT_CONTEXT_MISMATCH"
+  }
+}
