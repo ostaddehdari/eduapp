@@ -1,0 +1,118 @@
+{
+  "schema_version": "1.0",
+  "model_id": "S01-W03-T02",
+  "version": "1.0.0",
+  "status": "accepted",
+  "approved_at": "2026-11-23",
+  "requirement_ids": ["DATA-001"],
+  "contract": {
+    "id": "S01-W03",
+    "version": "1.0.0",
+    "path": "docs/contracts/S01-W03.json"
+  },
+  "decision": {
+    "adr": "docs/decisions/ADR-0002-initial-runtime-topology-and-split-process.md",
+    "architecture_style": "modular_monolith_with_explicit_bounded_contexts",
+    "default_action": "remain_in_modular_monolith"
+  },
+  "runtime_topology": [
+    {"id": "api", "role": "NestJS modular API", "release_unit": true, "stateful": false},
+    {"id": "worker", "role": "background jobs and outbox delivery", "release_unit": true, "stateful": false},
+    {"id": "public-web", "role": "Nuxt public HTTP client", "release_unit": true, "stateful": false},
+    {"id": "control-panel", "role": "React authenticated HTTP client", "release_unit": true, "stateful": false}
+  ],
+  "datastores": [
+    {"id": "postgres", "role": "transactional_source_of_truth", "isolation": "owner_schema_plus_tenant_id_compound_fk_and_rls", "cross_context_write": "forbidden"}
+  ],
+  "deferred_dependencies": [
+    {"id": "redis", "status": "deferred_until_measured", "source_of_truth": false},
+    {"id": "rabbitmq", "status": "deferred_until_poc", "replaces_transactional_outbox": false}
+  ],
+  "context_routes": [
+    {"context": "identity_access", "owner_schema": "identity_access", "primary_runtime": "api", "worker_mode": "event_consumer", "sync_entrypoint": "application_service", "authorization_owner": "context", "transaction_boundary": "owned_schema_only", "observability": ["request_id", "tenant_id_masked", "operation_id"]},
+    {"context": "tenancy_organization", "owner_schema": "tenancy_organization", "primary_runtime": "api", "worker_mode": "event_consumer", "sync_entrypoint": "application_service", "authorization_owner": "context", "transaction_boundary": "owned_schema_only", "observability": ["request_id", "tenant_id_masked", "operation_id"]},
+    {"context": "people_fields", "owner_schema": "people_fields", "primary_runtime": "api", "worker_mode": "none", "sync_entrypoint": "application_service", "authorization_owner": "context", "transaction_boundary": "owned_schema_only", "observability": ["request_id", "tenant_id_masked", "operation_id"]},
+    {"context": "commercial_billing", "owner_schema": "commercial_billing", "primary_runtime": "api", "worker_mode": "outbox_and_event_consumer", "sync_entrypoint": "application_service", "authorization_owner": "context", "transaction_boundary": "owned_schema_plus_outbox", "observability": ["request_id", "tenant_id_masked", "idempotency_key_hash", "operation_id"]},
+    {"context": "sites_content", "owner_schema": "sites_content", "primary_runtime": "api", "worker_mode": "event_consumer", "sync_entrypoint": "application_service", "authorization_owner": "context", "transaction_boundary": "owned_schema_plus_outbox", "observability": ["request_id", "tenant_id_masked", "operation_id"]},
+    {"context": "assets", "owner_schema": "assets", "primary_runtime": "api", "worker_mode": "scan_and_event_producer", "sync_entrypoint": "application_service", "authorization_owner": "context", "transaction_boundary": "owned_schema_plus_outbox", "observability": ["request_id", "tenant_id_masked", "asset_id", "operation_id"]},
+    {"context": "school_enrollment", "owner_schema": "school_enrollment", "primary_runtime": "api", "worker_mode": "event_consumer", "sync_entrypoint": "application_service", "authorization_owner": "context", "transaction_boundary": "owned_schema_plus_outbox", "observability": ["request_id", "tenant_id_masked", "operation_id"]},
+    {"context": "attendance", "owner_schema": "attendance", "primary_runtime": "api", "worker_mode": "device_ingest_and_event_producer", "sync_entrypoint": "application_service", "authorization_owner": "context", "transaction_boundary": "owned_schema_plus_outbox", "observability": ["request_id", "tenant_id_masked", "device_id", "operation_id"]},
+    {"context": "notifications_integrations", "owner_schema": "notifications_integrations", "primary_runtime": "api", "worker_mode": "provider_delivery_and_event_consumer", "sync_entrypoint": "application_service", "authorization_owner": "context", "transaction_boundary": "owned_schema_plus_outbox", "observability": ["request_id", "tenant_id_masked", "provider", "operation_id"]},
+    {"context": "platform_audit_jobs", "owner_schema": "platform_audit_jobs", "primary_runtime": "api", "worker_mode": "outbox_dispatch_inbox_dedupe_and_audit", "sync_entrypoint": "application_service", "authorization_owner": "context", "transaction_boundary": "owned_schema_only", "observability": ["request_id", "tenant_id_masked", "event_type", "consumer"]}
+  ],
+  "ownership_runtime_map": [
+    {"owner": "tenancy", "context": "tenancy_organization", "schema": "tenancy_organization", "write_runtime": "api"},
+    {"owner": "iam", "context": "identity_access", "schema": "identity_access", "write_runtime": "api"},
+    {"owner": "people", "context": "people_fields", "schema": "people_fields", "write_runtime": "api"},
+    {"owner": "access", "context": "identity_access", "schema": "identity_access", "write_runtime": "api"},
+    {"owner": "fields", "context": "people_fields", "schema": "people_fields", "write_runtime": "api"},
+    {"owner": "billing", "context": "commercial_billing", "schema": "commercial_billing", "write_runtime": "api"},
+    {"owner": "sites", "context": "sites_content", "schema": "sites_content", "write_runtime": "api"},
+    {"owner": "assets", "context": "assets", "schema": "assets", "write_runtime": "api_or_worker_via_owned_service"},
+    {"owner": "school", "context": "school_enrollment", "schema": "school_enrollment", "write_runtime": "api"},
+    {"owner": "attendance", "context": "attendance", "schema": "attendance", "write_runtime": "api_or_worker_via_owned_service"},
+    {"owner": "notifications", "context": "notifications_integrations", "schema": "notifications_integrations", "write_runtime": "api_or_worker_via_owned_service"},
+    {"owner": "platform", "context": "platform_audit_jobs", "schema": "platform_audit_jobs", "write_runtime": "worker"}
+  ],
+  "route_registry": [
+    {"tag": "System", "context": "platform_audit_jobs"},
+    {"tag": "Authentication", "context": "identity_access"},
+    {"tag": "Access", "context": "identity_access"},
+    {"tag": "Tenants", "context": "tenancy_organization"},
+    {"tag": "Users", "context": "people_fields"},
+    {"tag": "Custom Fields", "context": "people_fields"},
+    {"tag": "Billing", "context": "commercial_billing"},
+    {"tag": "Assets", "context": "assets"},
+    {"tag": "Sites", "context": "sites_content"},
+    {"tag": "Schools", "context": "school_enrollment"},
+    {"tag": "Enrollment", "context": "school_enrollment"},
+    {"tag": "Attendance", "context": "attendance"},
+    {"tag": "Notifications", "context": "notifications_integrations"},
+    {"tag": "Integrations", "context": "notifications_integrations"}
+  ],
+  "event_delivery": [
+    {"type": "identity.session_revoked.v1", "producer": "identity_access", "consumers": ["platform_audit_jobs"], "dedupe_key": "session_id+revision"},
+    {"type": "tenancy.org_unit_changed.v1", "producer": "tenancy_organization", "consumers": ["identity_access", "school_enrollment"], "dedupe_key": "org_unit_id+version"},
+    {"type": "people.profile_changed.v1", "producer": "people_fields", "consumers": ["school_enrollment"], "dedupe_key": "person_id+version"},
+    {"type": "fields.definition_published.v1", "producer": "people_fields", "consumers": ["sites_content", "school_enrollment"], "dedupe_key": "definition_id+schema_version"},
+    {"type": "billing.subscription_activated.v1", "producer": "commercial_billing", "consumers": ["tenancy_organization", "identity_access"], "dedupe_key": "subscription_id+activation_revision"},
+    {"type": "sites.page_published.v1", "producer": "sites_content", "consumers": ["platform_audit_jobs"], "dedupe_key": "page_id+revision"},
+    {"type": "assets.asset_ready.v1", "producer": "assets", "consumers": ["sites_content", "school_enrollment"], "dedupe_key": "asset_id+scan_revision"},
+    {"type": "school.enrollment_changed.v1", "producer": "school_enrollment", "consumers": ["attendance", "notifications_integrations"], "dedupe_key": "enrollment_id+version"},
+    {"type": "attendance.confirmed.v1", "producer": "attendance", "consumers": ["notifications_integrations", "platform_audit_jobs"], "dedupe_key": "attendance_record_id+revision"},
+    {"type": "notifications.delivery_updated.v1", "producer": "notifications_integrations", "consumers": ["platform_audit_jobs"], "dedupe_key": "message_attempt_id+status_revision"}
+  ],
+  "operational_flows": [
+    {"id": "authenticated_command", "steps": ["gateway_authenticates_and_rate_limits", "tenant_context_is_derived_from_active_membership", "owner_context_authorizes", "owner_service_writes_owned_schema", "transaction_commits", "response_returns"], "fail_closed": ["TENANT_CONTEXT_MISMATCH", "FOREIGN_DATA_OWNER"]},
+    {"id": "financial_command", "steps": ["stable_idempotency_key_is_required", "billing_context_authorizes", "ledger_and_aggregate_and_outbox_commit_together", "duplicate_key_returns_prior_result", "worker_dispatches_outbox"], "fail_closed": ["IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_PAYLOAD_MISMATCH"]},
+    {"id": "event_delivery", "steps": ["worker_claims_outbox", "versioned_event_is_dispatched", "consumer_registers_inbox_dedupe", "consumer_invokes_owned_application_service", "delivery_is_acknowledged"], "fail_closed": ["EVENT_CONTRACT_UNSUPPORTED", "EVENT_REPLAY_NO_SIDE_EFFECT"]},
+    {"id": "tenant_context_switch", "steps": ["connection_context_is_reset", "active_membership_is_verified", "tenant_context_is_bound", "owner_query_executes", "connection_context_is_cleared"], "fail_closed": ["TENANT_CONTEXT_MISMATCH", "TENANT_CONTEXT_NOT_BOUND"]},
+    {"id": "owner_schema_migration", "steps": ["owner_and_impact_are_declared", "expand_migration_is_reviewed", "staging_backup_and_restore_are_verified", "migration_runner_applies_owner_schema", "health_and_reconciliation_pass", "contract_or_code_switches", "obsolete_shape_is_removed_later"], "fail_closed": ["CROSS_OWNER_MIGRATION_REJECTED", "RESTORE_DRILL_REQUIRED"]},
+    {"id": "service_split_request", "steps": ["proposal_records_target_context", "mandatory_and_conditional_evidence_are_attached", "contract_and_data_migration_readiness_are_reviewed", "cost_and_slo_are_approved", "adr_is_reviewed", "split_is_scheduled_as_separate_change"], "fail_closed": ["SPLIT_EVIDENCE_INCOMPLETE", "SPLIT_ADR_REQUIRED"]}
+  ],
+  "environment_policy": [
+    {"environment": "development", "isolated_database": true, "isolated_secrets": true, "production_data_allowed": false},
+    {"environment": "staging", "isolated_database": true, "isolated_secrets": true, "production_data_allowed": false},
+    {"environment": "production", "isolated_database": true, "isolated_secrets": true, "production_data_allowed": true}
+  ],
+  "change_control": {
+    "api": ["backward_compatibility_check", "version_bump_for_breaking_change", "consumer_review"],
+    "event": ["schema_compatibility_check", "producer_consumer_contract_test", "replay_and_dedupe_review"],
+    "data_ownership": ["major_contract_version", "reviewed_adr", "expand_migrate_contract_plan", "reconciliation", "rollback_and_restore_drill"],
+    "deployment": ["immutable_source_sha", "health_check", "sanitized_log", "rollback_target"]
+  },
+  "split_decision": {
+    "states": ["proposed", "evidence_ready", "reviewed", "approved", "scheduled", "rejected"],
+    "required_always": ["contract_readiness", "data_migration_readiness", "cost_review"],
+    "required_any": ["independent_team", "measured_pressure", "independent_slo_or_security"],
+    "incomplete_error": "SPLIT_EVIDENCE_INCOMPLETE",
+    "approval_result": "eligible_for_reviewed_adr_not_automatic_split",
+    "automatic_split": false
+  },
+  "failure_policy": [
+    {"condition": "cross_context_database_write", "action": "reject", "error": "FOREIGN_DATA_OWNER"},
+    {"condition": "missing_or_invalid_tenant_context", "action": "reject_and_clear_connection", "error": "TENANT_CONTEXT_MISMATCH"},
+    {"condition": "duplicate_event", "action": "acknowledge_without_side_effect", "error": "EVENT_REPLAY_NO_SIDE_EFFECT"},
+    {"condition": "split_evidence_incomplete", "action": "remain_in_modular_monolith", "error": "SPLIT_EVIDENCE_INCOMPLETE"}
+  ]
+}
