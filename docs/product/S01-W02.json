@@ -1,0 +1,181 @@
+{
+  "schema_version": "1.0",
+  "prd_id": "S01-W02",
+  "version": "1.0.0",
+  "status": "accepted",
+  "approved_at": "2026-11-23",
+  "title": "Visitor-to-first-school commercial journey",
+  "phase": "P0",
+  "requirement_ids": ["FR-003", "FR-006"],
+  "source_contract": {
+    "path": "docs/contracts/S01-W02.json",
+    "contract_id": "S01-W02",
+    "version": "1.0.0"
+  },
+  "problem": "A verified purchase must create exactly one tenant and guide its owner to an independent or branched first school without crossing domain or tenant ownership boundaries.",
+  "outcomes": [
+    "A visitor can select an active plan and an authenticated buyer can complete a verified purchase.",
+    "A verified subscription provisions exactly one tenant and owner membership.",
+    "The tenant owner can create either an independent school or a collection, branch and school hierarchy.",
+    "Retries, forged callbacks and cross-tenant identifiers never duplicate effects or disclose another tenant."
+  ],
+  "personas": [
+    {"id": "visitor", "goal": "compare active plans", "entry": "public catalog", "exit": "plan selected"},
+    {"id": "authenticated_buyer", "goal": "purchase a plan", "entry": "active session", "exit": "payment pending or actionable failure"},
+    {"id": "payment_provider", "goal": "report payment state", "entry": "signed callback or server inquiry", "exit": "verified and deduplicated provider event"},
+    {"id": "provisioning_service", "goal": "provision a paid subscription", "entry": "verified activation event", "exit": "one active tenant and owner membership"},
+    {"id": "tenant_owner", "goal": "create the first organization and school", "entry": "active tenant owner context", "exit": "onboarding complete"},
+    {"id": "platform_admin", "goal": "recover an exceptional provisioning case", "entry": "privileged audited session", "exit": "audited tenant action"}
+  ],
+  "journey": {
+    "states": [
+      "PLAN_SELECTED",
+      "BUYER_AUTHENTICATED",
+      "CHECKOUT_CREATED",
+      "PAYMENT_PENDING",
+      "PAYMENT_VERIFIED",
+      "TENANT_ACTIVE",
+      "FIRST_ORG_CREATED",
+      "FIRST_SCHOOL_CREATED",
+      "ONBOARDING_COMPLETE"
+    ],
+    "steps": [
+      {"order": 1, "actor": "visitor", "operation_id": "listPlans", "user_result": "active plan versions are shown", "next_state": "PLAN_SELECTED"},
+      {"order": 2, "actor": "authenticated_buyer", "operation_id": "createCheckout", "user_result": "immutable price and invoice are created", "next_state": "CHECKOUT_CREATED"},
+      {"order": 3, "actor": "authenticated_buyer", "operation_id": "createPaymentAttempt", "user_result": "provider redirect or payment instruction is returned", "next_state": "PAYMENT_PENDING"},
+      {"order": 4, "actor": "payment_provider", "operation_id": "receivePaymentWebhook", "user_result": "payment is verified server-side and replay-safe", "next_state": "PAYMENT_VERIFIED"},
+      {"order": 5, "actor": "provisioning_service", "operation_id": "createTenant", "user_result": "one tenant and owner context are provisioned", "next_state": "TENANT_ACTIVE"},
+      {"order": 6, "actor": "tenant_owner", "operation_id": "createOrgUnit", "user_result": "the first root or branch organization unit is created", "next_state": "FIRST_ORG_CREATED"},
+      {"order": 7, "actor": "tenant_owner", "operation_id": "createSchool", "user_result": "the first school is bound to a same-tenant organization unit", "next_state": "FIRST_SCHOOL_CREATED"},
+      {"order": 8, "actor": "tenant_owner", "operation_id": "getMyCapabilities", "user_result": "effective capabilities and onboarding completion are displayed", "next_state": "ONBOARDING_COMPLETE"}
+    ]
+  },
+  "business_rules": [
+    {"id": "BR-01", "rule": "Only an active immutable plan version may be checked out."},
+    {"id": "BR-02", "rule": "A provider callback alone never activates a subscription; signature or server inquiry must verify it."},
+    {"id": "BR-03", "rule": "Five deliveries of the same provider event create one provider event, ledger effect, entitlement, subscription activation and tenant."},
+    {"id": "BR-04", "rule": "Tenant provisioning is keyed by subscription_id and is retry-safe."},
+    {"id": "BR-05", "rule": "A tenant owner may create only organization units and schools inside the active tenant context."},
+    {"id": "BR-06", "rule": "Organization parents and school organization units must belong to the same tenant; foreign identifiers return non-disclosing not-found errors."},
+    {"id": "BR-07", "rule": "Organization trees are acyclic and sibling codes are unique within a parent; root codes are unique within a tenant."},
+    {"id": "BR-08", "rule": "Entitlement and permission are evaluated independently before onboarding capabilities are returned."}
+  ],
+  "organization_models": [
+    {
+      "id": "independent_school",
+      "shape": ["tenant", "root_school_org_unit", "school"],
+      "rules": ["root parent_id is null", "school.tenant_id equals org_unit.tenant_id", "school.org_unit_id points to root_school_org_unit"]
+    },
+    {
+      "id": "branched_school",
+      "shape": ["tenant", "collection_org_unit", "branch_org_unit", "school"],
+      "rules": ["branch parent is collection in the same tenant", "school is bound to a same-tenant branch", "moving an org unit requires version and cycle checks"]
+    }
+  ],
+  "ownership_boundaries": [
+    {"owner": "iam", "writes": ["identities", "sessions"], "forbidden": ["tenants", "ledger_entries"]},
+    {"owner": "billing", "writes": ["plans", "plan_versions", "subscriptions", "invoices", "payment_attempts", "provider_events", "ledger_entries", "entitlements"], "forbidden": ["tenants", "org_units", "schools"]},
+    {"owner": "tenancy", "writes": ["tenants", "org_units"], "forbidden": ["ledger_entries", "entitlements", "schools"]},
+    {"owner": "access", "writes": ["memberships", "roles", "role_bindings"], "forbidden": ["invoices", "org_units", "schools"]},
+    {"owner": "school", "writes": ["schools"], "forbidden": ["tenants", "org_units", "ledger_entries"]},
+    {"owner": "platform", "writes": ["outbox_events", "inbox_dedup", "audit_events"], "forbidden": ["subscriptions", "tenants", "schools"]}
+  ],
+  "acceptance_scenarios": [
+    {
+      "id": "happy-independent-school",
+      "kind": "happy_path",
+      "given": ["an active plan version", "an authenticated buyer", "a provider payment verified server-side"],
+      "when": ["checkout and payment attempt are created", "the verified event provisions a tenant", "the owner creates a root school org unit and school"],
+      "then": ["exactly one active subscription and tenant exist", "school and org unit share the tenant", "onboarding reaches ONBOARDING_COMPLETE"],
+      "operation_ids": ["listPlans", "createCheckout", "createPaymentAttempt", "receivePaymentWebhook", "createTenant", "createOrgUnit", "createSchool", "getMyCapabilities"],
+      "expected": "accepted"
+    },
+    {
+      "id": "happy-branched-school",
+      "kind": "happy_path",
+      "given": ["an active paid tenant owner context"],
+      "when": ["the owner creates a collection", "the owner creates a same-tenant branch", "the owner binds a school to that branch"],
+      "then": ["the hierarchy is acyclic", "all records have one tenant", "the owner receives school-scoped capabilities"],
+      "operation_ids": ["createOrgUnit", "createSchool", "getMyCapabilities"],
+      "expected": "accepted"
+    },
+    {
+      "id": "duplicate-payment-event",
+      "kind": "replay",
+      "given": ["one valid provider event"],
+      "when": ["the identical provider_event_id is delivered five times"],
+      "then": ["one provider event is accepted", "one ledger effect, entitlement, activation and tenant exist", "all repeats return a safe idempotent result"],
+      "operation_ids": ["receivePaymentWebhook", "createTenant"],
+      "repeat_count": 5,
+      "expected": "deduplicated"
+    },
+    {
+      "id": "unverified-payment-callback",
+      "kind": "security_negative",
+      "given": ["an invalid signature and failed provider inquiry"],
+      "when": ["the callback is submitted"],
+      "then": ["PAYMENT_NOT_VERIFIED is returned", "no ledger, entitlement, activation or tenant is created"],
+      "operation_ids": ["receivePaymentWebhook"],
+      "expected": "rejected",
+      "error": "PAYMENT_NOT_VERIFIED"
+    },
+    {
+      "id": "cross-tenant-parent",
+      "kind": "tenant_isolation",
+      "given": ["an owner in tenant A", "an org unit identifier from tenant B"],
+      "when": ["the owner uses that identifier as parent"],
+      "then": ["ORG_PARENT_NOT_FOUND is returned", "tenant B is not disclosed or modified"],
+      "operation_ids": ["createOrgUnit"],
+      "expected": "rejected",
+      "error": "ORG_PARENT_NOT_FOUND"
+    },
+    {
+      "id": "org-cycle",
+      "kind": "integrity_negative",
+      "given": ["an existing organization hierarchy"],
+      "when": ["a move would make a node its own ancestor"],
+      "then": ["ORG_CYCLE is returned", "the hierarchy version remains unchanged"],
+      "operation_ids": ["createOrgUnit"],
+      "expected": "rejected",
+      "error": "ORG_CYCLE"
+    },
+    {
+      "id": "duplicate-sibling-code",
+      "kind": "integrity_negative",
+      "given": ["an org unit code already used below a parent"],
+      "when": ["the same normalized code is created below that parent"],
+      "then": ["ORG_CODE_CONFLICT is returned", "no duplicate row is written"],
+      "operation_ids": ["createOrgUnit"],
+      "expected": "rejected",
+      "error": "ORG_CODE_CONFLICT"
+    },
+    {
+      "id": "school-org-other-tenant",
+      "kind": "tenant_isolation",
+      "given": ["an owner in tenant A", "an org unit identifier from tenant B"],
+      "when": ["the owner tries to bind a school to it"],
+      "then": ["ORG_UNIT_NOT_FOUND is returned", "tenant B is not disclosed or modified"],
+      "operation_ids": ["createSchool"],
+      "expected": "rejected",
+      "error": "ORG_UNIT_NOT_FOUND"
+    }
+  ],
+  "telemetry": [
+    {"name": "commercial_journey_step_completed", "dimensions": ["step", "result", "plan_version"], "forbidden_dimensions": ["card_number", "child_data", "raw_provider_payload"]},
+    {"name": "commercial_journey_duration_seconds", "dimensions": ["from_step", "to_step", "result"], "forbidden_dimensions": ["buyer_name", "phone", "email"]},
+    {"name": "provisioning_retry_total", "dimensions": ["result", "error_code"], "forbidden_dimensions": ["tenant_slug", "provider_secret"]}
+  ],
+  "definition_of_done": [
+    "Both organization models have executable acceptance scenarios.",
+    "Every operation_id exists in the accepted contract and current OpenAPI document.",
+    "Every contract acceptance scenario is represented without weakening its expected result or error.",
+    "The five-delivery replay produces one financial and provisioning effect.",
+    "Ownership boundaries assign every contract-owned table to one writer.",
+    "No scenario, event or telemetry field requires card data, child data or secrets."
+  ],
+  "non_goals": [
+    "Implementing the backend, database migrations or payment provider adapter",
+    "Creating academic years, classes, students or attendance",
+    "Changing Nginx, production data or the deployed static preview"
+  ]
+}
