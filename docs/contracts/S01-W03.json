@@ -1,0 +1,124 @@
+{
+  "schema_version": "1.0",
+  "contract_id": "S01-W03",
+  "version": "1.0.0",
+  "status": "accepted",
+  "approved_at": "2026-11-23",
+  "requirement_ids": ["DATA-001"],
+  "architecture_style": "modular_monolith_with_explicit_bounded_contexts",
+  "bounded_contexts": [
+    {"id": "identity_access", "source_module": "IAM/Access", "data_owners": ["iam", "access"], "sync_contract": "authentication, sessions, capabilities, roles and scoped membership", "forbidden": ["billing ledger write", "tenant tree write"]},
+    {"id": "tenancy_organization", "source_module": "Tenant/Organization", "data_owners": ["tenancy"], "sync_contract": "tenant and organization tree commands and queries", "forbidden": ["identity credential write", "billing ledger write"]},
+    {"id": "people_fields", "source_module": "Persons/Fields", "data_owners": ["people", "fields"], "sync_contract": "tenant-scoped person profiles and versioned custom fields", "forbidden": ["global identity credential write", "school enrollment write"]},
+    {"id": "commercial_billing", "source_module": "Commercial/Billing", "data_owners": ["billing"], "sync_contract": "plans, checkout, invoices, payment attempts and entitlements", "forbidden": ["tenant provisioning table write", "school accounting write"]},
+    {"id": "sites_content", "source_module": "Sites/Domains/Pages", "data_owners": ["sites"], "sync_contract": "sites, verified domains and immutable page revisions", "forbidden": ["private asset ACL write", "tenant tree write"]},
+    {"id": "assets", "source_module": "Assets", "data_owners": ["assets"], "sync_contract": "upload sessions, scan state and scoped downloads", "forbidden": ["page publication write", "person profile write"]},
+    {"id": "school_enrollment", "source_module": "School/Enrollment", "data_owners": ["school"], "sync_contract": "schools, years, classes, enrollment and guardianship", "forbidden": ["attendance revision write", "identity credential write"]},
+    {"id": "attendance", "source_module": "Attendance", "data_owners": ["attendance"], "sync_contract": "device events and confirmed attendance revisions", "forbidden": ["enrollment ownership write", "notification delivery write"]},
+    {"id": "notifications_integrations", "source_module": "Notifications/Integrations", "data_owners": ["notifications"], "sync_contract": "provider capability, delivery jobs and attempts", "forbidden": ["attendance confirmation write", "billing ledger write"]},
+    {"id": "platform_audit_jobs", "source_module": "Audit/Jobs", "data_owners": ["platform"], "sync_contract": "outbox, inbox dedupe, audit and background job coordination", "forbidden": ["domain aggregate mutation", "authorization decision from event payload"]}
+  ],
+  "initial_deployment": {
+    "decision": "accepted_initial_shape",
+    "runtime_units": [
+      {"id": "api", "kind": "NestJS modular API", "hosts": ["identity_access", "tenancy_organization", "people_fields", "commercial_billing", "sites_content", "assets", "school_enrollment", "attendance", "notifications_integrations", "platform_audit_jobs"]},
+      {"id": "worker", "kind": "background worker", "hosts": ["commercial_billing", "assets", "attendance", "notifications_integrations", "platform_audit_jobs"]},
+      {"id": "public-web", "kind": "Nuxt public web", "hosts": ["public HTTP client only"]},
+      {"id": "control-panel", "kind": "React control panel", "hosts": ["authenticated HTTP client only"]}
+    ],
+    "datastores": [
+      {"id": "postgres", "role": "transactional source of truth", "mode": "shared physical database with owner schemas, tenant_id, compound FK and RLS defense in depth"}
+    ],
+    "deferred_dependencies": [
+      {"id": "redis", "status": "deferred_until_measured", "allowed_use": "rebuildable cache and rate limit only"},
+      {"id": "rabbitmq", "status": "deferred_until_poc", "allowed_use": "versioned async delivery after outbox"}
+    ]
+  },
+  "table_ownership": [
+    {"owner": "tenancy", "context": "tenancy_organization", "tables": ["tenants", "org_units"]},
+    {"owner": "iam", "context": "identity_access", "tables": ["identities", "sessions"]},
+    {"owner": "people", "context": "people_fields", "tables": ["persons"]},
+    {"owner": "access", "context": "identity_access", "tables": ["memberships", "roles", "role_bindings"]},
+    {"owner": "fields", "context": "people_fields", "tables": ["field_definitions", "field_values"]},
+    {"owner": "billing", "context": "commercial_billing", "tables": ["plans", "plan_versions", "entitlements", "subscriptions", "invoices", "payment_attempts", "provider_events", "ledger_entries"]},
+    {"owner": "sites", "context": "sites_content", "tables": ["sites", "domains", "page_revisions"]},
+    {"owner": "assets", "context": "assets", "tables": ["media_assets", "upload_sessions"]},
+    {"owner": "school", "context": "school_enrollment", "tables": ["schools", "academic_years", "class_groups", "enrollments", "guardian_links"]},
+    {"owner": "attendance", "context": "attendance", "tables": ["device_events", "attendance_records", "attendance_revisions"]},
+    {"owner": "notifications", "context": "notifications_integrations", "tables": ["message_jobs", "message_attempts"]},
+    {"owner": "platform", "context": "platform_audit_jobs", "tables": ["outbox_events", "inbox_dedup", "audit_events"]}
+  ],
+  "api_tag_ownership": [
+    {"tag": "System", "context": "platform_audit_jobs"},
+    {"tag": "Authentication", "context": "identity_access"},
+    {"tag": "Access", "context": "identity_access"},
+    {"tag": "Tenants", "context": "tenancy_organization"},
+    {"tag": "Users", "context": "people_fields"},
+    {"tag": "Custom Fields", "context": "people_fields"},
+    {"tag": "Billing", "context": "commercial_billing"},
+    {"tag": "Assets", "context": "assets"},
+    {"tag": "Sites", "context": "sites_content"},
+    {"tag": "Schools", "context": "school_enrollment"},
+    {"tag": "Enrollment", "context": "school_enrollment"},
+    {"tag": "Attendance", "context": "attendance"},
+    {"tag": "Notifications", "context": "notifications_integrations"},
+    {"tag": "Integrations", "context": "notifications_integrations"}
+  ],
+  "event_contracts": [
+    {"type": "identity.session_revoked.v1", "producer": "identity_access", "consumers": ["platform_audit_jobs"], "dedupe_key": "session_id+revision"},
+    {"type": "tenancy.org_unit_changed.v1", "producer": "tenancy_organization", "consumers": ["identity_access", "school_enrollment"], "dedupe_key": "org_unit_id+version"},
+    {"type": "people.profile_changed.v1", "producer": "people_fields", "consumers": ["school_enrollment"], "dedupe_key": "person_id+version"},
+    {"type": "fields.definition_published.v1", "producer": "people_fields", "consumers": ["sites_content", "school_enrollment"], "dedupe_key": "definition_id+schema_version"},
+    {"type": "billing.subscription_activated.v1", "producer": "commercial_billing", "consumers": ["tenancy_organization", "identity_access"], "dedupe_key": "subscription_id+activation_revision"},
+    {"type": "sites.page_published.v1", "producer": "sites_content", "consumers": ["platform_audit_jobs"], "dedupe_key": "page_id+revision"},
+    {"type": "assets.asset_ready.v1", "producer": "assets", "consumers": ["sites_content", "school_enrollment"], "dedupe_key": "asset_id+scan_revision"},
+    {"type": "school.enrollment_changed.v1", "producer": "school_enrollment", "consumers": ["attendance", "notifications_integrations"], "dedupe_key": "enrollment_id+version"},
+    {"type": "attendance.confirmed.v1", "producer": "attendance", "consumers": ["notifications_integrations", "platform_audit_jobs"], "dedupe_key": "attendance_record_id+revision"},
+    {"type": "notifications.delivery_updated.v1", "producer": "notifications_integrations", "consumers": ["platform_audit_jobs"], "dedupe_key": "message_attempt_id+status_revision"}
+  ],
+  "access_matrix": [
+    {"actor": "api_gateway", "allow": ["authenticate", "rate_limit", "route"], "deny": ["direct_table_write", "final_domain_authorization"]},
+    {"actor": "context_module", "allow": ["write_owned_tables", "authorize_owned_commands", "publish_versioned_event"], "deny": ["write_foreign_tables", "trust_external_tenant_id"]},
+    {"actor": "worker_consumer", "allow": ["dedupe_event", "invoke_owned_application_service"], "deny": ["cross_context_sql", "authorize_user_from_event_payload"]},
+    {"actor": "public_web", "allow": ["public_versioned_http"], "deny": ["database_access", "internal_event_publish"]},
+    {"actor": "control_panel", "allow": ["authenticated_versioned_http"], "deny": ["database_access", "server_side_business_rule_bypass"]},
+    {"actor": "migration_runner", "allow": ["approved_owner_schema_migration"], "deny": ["application_runtime", "unreviewed_cross_owner_migration"]},
+    {"actor": "support_analyst", "allow": ["masked_authorized_read_model"], "deny": ["raw_pii_export", "direct_production_write"]}
+  ],
+  "data_rules": [
+    "tenant_owned_rows_require_tenant_id_not_null",
+    "shared_database_cross_row_references_use_compound_tenant_foreign_keys",
+    "rls_is_defense_in_depth_and_never_replaces_application_authorization",
+    "connection_pool_reuse_must_reset_and_rebind_tenant_context",
+    "financial_mutations_require_stable_idempotency_keys_and_append_only_ledger",
+    "outbox_is_written_in_the_same_transaction_as_the_owned_aggregate",
+    "consumers_register_inbox_dedupe_before_side_effect",
+    "no_shared_repository_or_orm_model_across_context_owners",
+    "frontend_and_ssr_never_query_domain_database_directly",
+    "event_payload_is_insufficient_for_user_authorization"
+  ],
+  "split_gates": [
+    {"id": "independent_team", "required_evidence": "named owning team, on-call and release responsibility"},
+    {"id": "measured_pressure", "required_evidence": "at least 30 days of load, latency, queue or database contention measurements"},
+    {"id": "independent_slo_or_security", "required_evidence": "documented SLO, regulatory or isolation need that cannot be met in-process"},
+    {"id": "contract_readiness", "required_evidence": "versioned API/event contract, compatibility tests and observability"},
+    {"id": "data_migration_readiness", "required_evidence": "owner-preserving migration, reconciliation, rollback and restore drill"},
+    {"id": "cost_review", "required_evidence": "network, broker, secrets, CI/CD and operational cost approved in ADR"}
+  ],
+  "split_policy": {
+    "default": "deferred",
+    "decision": "no context becomes an independent runtime from preference alone",
+    "minimum": "contract_readiness and data_migration_readiness plus at least one of independent_team, measured_pressure or independent_slo_or_security; cost_review is always required",
+    "result": "eligible_for_reviewed_adr_not_automatic_split"
+  },
+  "acceptance_scenarios": [
+    {"id": "all-openapi-operations-owned", "expected": "accepted"},
+    {"id": "all-proposal-tables-single-owner", "expected": "accepted"},
+    {"id": "direct-cross-context-write", "expected": "rejected", "error": "FOREIGN_DATA_OWNER"},
+    {"id": "tenant-pool-reuse", "expected": "isolated", "error": "TENANT_CONTEXT_MISMATCH"},
+    {"id": "financial-command-replay", "expected": "deduplicated"},
+    {"id": "event-replay", "expected": "deduplicated"},
+    {"id": "premature-service-split", "expected": "rejected", "error": "SPLIT_EVIDENCE_INCOMPLETE"},
+    {"id": "reviewed-service-split", "expected": "eligible_for_reviewed_adr"}
+  ]
+}
