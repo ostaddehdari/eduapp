@@ -1,0 +1,90 @@
+{
+  "schema_version": "1.0",
+  "contract_id": "S01-W02",
+  "version": "1.0.0",
+  "status": "accepted",
+  "approved_at": "2026-11-23",
+  "owner": "Product Architecture",
+  "requirement_ids": ["FR-003", "FR-006"],
+  "scope": "visitor_to_verified_purchase_and_first_tenant_organization_school",
+  "journey": {
+    "states": [
+      "PLAN_SELECTED",
+      "BUYER_AUTHENTICATED",
+      "CHECKOUT_CREATED",
+      "PAYMENT_PENDING",
+      "PAYMENT_VERIFIED",
+      "TENANT_ACTIVE",
+      "FIRST_ORG_CREATED",
+      "FIRST_SCHOOL_CREATED",
+      "ONBOARDING_COMPLETE"
+    ],
+    "steps": [
+      {"order": 1, "actor": "visitor", "operation_id": "listPlans", "from": null, "to": "PLAN_SELECTED"},
+      {"order": 2, "actor": "authenticated_buyer", "operation_id": "createCheckout", "from": "PLAN_SELECTED", "to": "CHECKOUT_CREATED"},
+      {"order": 3, "actor": "authenticated_buyer", "operation_id": "createPaymentAttempt", "from": "CHECKOUT_CREATED", "to": "PAYMENT_PENDING"},
+      {"order": 4, "actor": "payment_provider", "operation_id": "receivePaymentWebhook", "from": "PAYMENT_PENDING", "to": "PAYMENT_VERIFIED"},
+      {"order": 5, "actor": "provisioning_service", "operation_id": "createTenant", "from": "PAYMENT_VERIFIED", "to": "TENANT_ACTIVE"},
+      {"order": 6, "actor": "tenant_owner", "operation_id": "createOrgUnit", "from": "TENANT_ACTIVE", "to": "FIRST_ORG_CREATED"},
+      {"order": 7, "actor": "tenant_owner", "operation_id": "createSchool", "from": "FIRST_ORG_CREATED", "to": "FIRST_SCHOOL_CREATED"},
+      {"order": 8, "actor": "tenant_owner", "operation_id": "getMyCapabilities", "from": "FIRST_SCHOOL_CREATED", "to": "ONBOARDING_COMPLETE"}
+    ]
+  },
+  "api_contracts": [
+    {"operation_id": "listPlans", "method": "GET", "path": "/plans", "owner": "billing", "actor": "visitor", "auth": "public", "idempotency": "read_only", "success": 200, "errors": [429]},
+    {"operation_id": "createCheckout", "method": "POST", "path": "/subscriptions/checkout", "owner": "billing", "actor": "authenticated_buyer", "auth": "active_session", "idempotency": "Idempotency-Key", "success": 201, "errors": [401, 409, 422, 429]},
+    {"operation_id": "createPaymentAttempt", "method": "POST", "path": "/invoices/{invoiceId}/payment-attempts", "owner": "billing", "actor": "authenticated_buyer", "auth": "invoice_payer", "idempotency": "Idempotency-Key", "success": 202, "errors": [401, 403, 404, 409, 422]},
+    {"operation_id": "receivePaymentWebhook", "method": "POST", "path": "/webhooks/payments/{provider}", "owner": "billing", "actor": "payment_provider", "auth": "verified_signature_or_provider_inquiry", "idempotency": "provider+provider_event_id", "success": 200, "errors": [401, 409, 422]},
+    {"operation_id": "createTenant", "method": "POST", "path": "/tenants", "owner": "tenancy", "actor": "provisioning_service", "auth": "verified_payment_event_or_platform_admin", "idempotency": "subscription_id", "success": 201, "errors": [401, 403, 409, 422]},
+    {"operation_id": "createOrgUnit", "method": "POST", "path": "/org-units", "owner": "tenancy", "actor": "tenant_owner", "auth": "tenant_owner_scope", "idempotency": "tenant_id+parent_id+code", "success": 201, "errors": [401, 403, 404, 409, 422]},
+    {"operation_id": "createSchool", "method": "POST", "path": "/schools", "owner": "school", "actor": "tenant_owner", "auth": "tenant_owner_scope", "idempotency": "tenant_id+org_unit_id", "success": 201, "errors": [401, 403, 404, 409, 422]},
+    {"operation_id": "getMyCapabilities", "method": "GET", "path": "/me/capabilities", "owner": "access", "actor": "tenant_owner", "auth": "active_membership", "idempotency": "read_only", "success": 200, "errors": [401, 403]}
+  ],
+  "events": [
+    {"type": "billing.payment_verified.v1", "producer": "billing", "consumer": "billing", "aggregate": "invoice", "dedupe_key": "provider+provider_event_id", "contains_pii": false},
+    {"type": "billing.subscription_activated.v1", "producer": "billing", "consumer": "provisioning", "aggregate": "subscription", "dedupe_key": "subscription_id+activation_revision", "contains_pii": false},
+    {"type": "tenancy.tenant_created.v1", "producer": "tenancy", "consumer": "access", "aggregate": "tenant", "dedupe_key": "tenant_id", "contains_pii": false},
+    {"type": "tenancy.org_unit_created.v1", "producer": "tenancy", "consumer": "school", "aggregate": "org_unit", "dedupe_key": "org_unit_id", "contains_pii": false},
+    {"type": "school.school_created.v1", "producer": "school", "consumer": "onboarding", "aggregate": "school", "dedupe_key": "school_id", "contains_pii": false},
+    {"type": "onboarding.completed.v1", "producer": "onboarding", "consumer": "analytics", "aggregate": "tenant", "dedupe_key": "tenant_id+journey_version", "contains_pii": false}
+  ],
+  "data_ownership": [
+    {"owner": "iam", "tables": ["identities", "sessions"], "tenant_scope": "identity_global_session_scoped"},
+    {"owner": "billing", "tables": ["plans", "plan_versions", "subscriptions", "invoices", "payment_attempts", "provider_events", "ledger_entries", "entitlements"], "tenant_scope": "catalog_global_transactions_tenant_owned"},
+    {"owner": "tenancy", "tables": ["tenants", "org_units"], "tenant_scope": "tenant_owned_with_compound_foreign_keys"},
+    {"owner": "access", "tables": ["memberships", "roles", "role_bindings"], "tenant_scope": "tenant_owned"},
+    {"owner": "school", "tables": ["schools"], "tenant_scope": "tenant_owned_org_unit_bound"},
+    {"owner": "platform", "tables": ["outbox_events", "inbox_dedup", "audit_events"], "tenant_scope": "tenant_tagged_append_only"}
+  ],
+  "permission_matrix": [
+    {"actor": "visitor", "allow": ["listPlans"], "deny": ["createCheckout", "createTenant", "createOrgUnit", "createSchool"]},
+    {"actor": "authenticated_buyer", "allow": ["listPlans", "createCheckout", "createPaymentAttempt"], "deny": ["receivePaymentWebhook", "createTenant", "createOrgUnit", "createSchool"]},
+    {"actor": "payment_provider", "allow": ["receivePaymentWebhook"], "deny": ["createTenant", "createOrgUnit", "createSchool"]},
+    {"actor": "provisioning_service", "allow": ["createTenant"], "deny": ["createPaymentAttempt", "createOrgUnit", "createSchool"]},
+    {"actor": "platform_admin", "allow": ["createTenant"], "deny": ["receivePaymentWebhook"]},
+    {"actor": "tenant_owner", "allow": ["createOrgUnit", "createSchool", "getMyCapabilities"], "deny": ["receivePaymentWebhook", "createTenant"]},
+    {"actor": "school_admin", "allow": ["getMyCapabilities"], "deny": ["createTenant", "createOrgUnit", "receivePaymentWebhook"]}
+  ],
+  "invariants": [
+    "tenant_creation_requires_verified_payment_or_platform_admin",
+    "payment_callback_alone_never_activates_subscription",
+    "billing_never_writes_tenants_or_org_units",
+    "tenancy_never_writes_ledger_or_entitlements",
+    "org_parent_must_belong_to_same_tenant",
+    "org_tree_must_be_acyclic",
+    "org_code_unique_within_parent",
+    "school_org_unit_must_belong_to_same_tenant",
+    "event_consumers_must_dedupe_before_side_effect",
+    "external_tenant_id_is_never_trusted"
+  ],
+  "acceptance_scenarios": [
+    {"id": "happy-independent-school", "expected": "accepted", "evidence": ["verified_payment", "root_school_org_unit", "school_same_tenant"]},
+    {"id": "happy-branched-school", "expected": "accepted", "evidence": ["verified_payment", "branch_org_unit", "school_child_same_tenant"]},
+    {"id": "duplicate-payment-event", "expected": "deduplicated", "error": null},
+    {"id": "unverified-payment-callback", "expected": "rejected", "error": "PAYMENT_NOT_VERIFIED"},
+    {"id": "cross-tenant-parent", "expected": "rejected", "error": "ORG_PARENT_NOT_FOUND"},
+    {"id": "org-cycle", "expected": "rejected", "error": "ORG_CYCLE"},
+    {"id": "duplicate-sibling-code", "expected": "rejected", "error": "ORG_CODE_CONFLICT"},
+    {"id": "school-org-other-tenant", "expected": "rejected", "error": "ORG_UNIT_NOT_FOUND"}
+  ]
+}
