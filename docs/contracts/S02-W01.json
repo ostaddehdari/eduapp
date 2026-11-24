@@ -1,0 +1,128 @@
+{
+  "schema_version": "1.0",
+  "contract_id": "S02-W01",
+  "version": "1.0.0",
+  "status": "accepted",
+  "approved_at": "2026-11-24",
+  "requirement_ids": ["OPS-001"],
+  "scope": "monorepo_and_ci_governance_contract_only",
+  "implementation_authorization": {
+    "next_task": "S02-W01-T02",
+    "create_workspace": false,
+    "change_branch_protection": false,
+    "deploy_production": false,
+    "write_production_data": false
+  },
+  "monorepo": {
+    "workspace_manager": "pnpm",
+    "lockfile_required": true,
+    "runtime_units": [
+      {"id": "api", "framework": "NestJS", "path": "apps/api", "owner": "backend", "required_commands": ["lint", "typecheck", "test", "build"]},
+      {"id": "worker", "framework": "NestJS", "path": "apps/worker", "owner": "backend", "required_commands": ["lint", "typecheck", "test", "build"]},
+      {"id": "public-web", "framework": "Nuxt", "path": "apps/public-web", "owner": "public_web", "required_commands": ["lint", "typecheck", "test", "build"]},
+      {"id": "control-panel", "framework": "React", "path": "apps/control-panel", "owner": "control_panel", "required_commands": ["lint", "typecheck", "test", "build"]}
+    ],
+    "shared_units": [
+      {"id": "contracts", "path": "packages/contracts", "owner": "contracts", "may_import_apps": false},
+      {"id": "config", "path": "packages/config", "owner": "platform", "may_import_apps": false},
+      {"id": "test-utils", "path": "packages/test-utils", "owner": "platform", "may_import_apps": false}
+    ],
+    "dependency_rules": [
+      "apps_may_import_published_workspace_packages_only",
+      "packages_must_not_import_apps",
+      "frontends_must_not_import_backend_internals",
+      "frontends_must_not_access_domain_database",
+      "domain_repository_ownership_from_S01-W03_remains_enforced",
+      "cross_context_access_uses_versioned_contracts"
+    ]
+  },
+  "ownership": {
+    "github_bootstrap_owner": "@ostaddehdari",
+    "logical_owners": ["platform", "backend", "public_web", "control_panel", "contracts", "security", "ci"],
+    "codeowner_rules": [
+      {"pattern": "*", "logical_owner": "platform", "github_owner": "@ostaddehdari"},
+      {"pattern": "/.github/", "logical_owner": "ci", "github_owner": "@ostaddehdari"},
+      {"pattern": "/apps/api/", "logical_owner": "backend", "github_owner": "@ostaddehdari"},
+      {"pattern": "/apps/worker/", "logical_owner": "backend", "github_owner": "@ostaddehdari"},
+      {"pattern": "/apps/public-web/", "logical_owner": "public_web", "github_owner": "@ostaddehdari"},
+      {"pattern": "/apps/control-panel/", "logical_owner": "control_panel", "github_owner": "@ostaddehdari"},
+      {"pattern": "/packages/contracts/", "logical_owner": "contracts", "github_owner": "@ostaddehdari"},
+      {"pattern": "/docs/contracts/", "logical_owner": "contracts", "github_owner": "@ostaddehdari"},
+      {"pattern": "/infra/ci/", "logical_owner": "ci", "github_owner": "@ostaddehdari"}
+    ],
+    "repository_data": [
+      {"artifact": "workspace_manifest", "path": "pnpm-workspace.yaml", "owner": "platform"},
+      {"artifact": "dependency_lockfile", "path": "pnpm-lock.yaml", "owner": "platform"},
+      {"artifact": "ci_workflows", "path": ".github/workflows", "owner": "ci"},
+      {"artifact": "codeowners", "path": ".github/CODEOWNERS", "owner": "security"},
+      {"artifact": "runtime_source", "path": "apps", "owner": "platform"},
+      {"artifact": "api_event_contracts", "path": "packages/contracts", "owner": "contracts"}
+    ]
+  },
+  "api_event_and_table_policy": {
+    "runtime_api_added_by_this_task": [],
+    "domain_events_added_by_this_task": [],
+    "database_tables_added_by_this_task": [],
+    "api_source_of_truth": "versioned OpenAPI owned under packages/contracts; current S01-W03 ownership remains authoritative until migrated",
+    "event_source_of_truth": "versioned schemas owned under packages/contracts; GitHub webhooks and CI status are not domain events",
+    "table_ownership_source_of_truth": "S01-W03",
+    "ci_database_rule": "CI and pull-request jobs have no production database credentials and cannot write domain tables"
+  },
+  "ci_contract": {
+    "trigger": {"event": "pull_request", "target_branch": "main"},
+    "permissions": {"default": "contents:read", "pull_requests": "read", "id_token": "none"},
+    "required_checks": [
+      {"name": "ci / repository-policy", "owner": "ci", "commands": ["validate-contracts", "validate-codeowners", "validate-boundaries"]},
+      {"name": "ci / api", "owner": "backend", "commands": ["lint", "typecheck", "test", "build"]},
+      {"name": "ci / worker", "owner": "backend", "commands": ["lint", "typecheck", "test", "build"]},
+      {"name": "ci / public-web", "owner": "public_web", "commands": ["lint", "typecheck", "test", "build"]},
+      {"name": "ci / control-panel", "owner": "control_panel", "commands": ["lint", "typecheck", "test", "build"]},
+      {"name": "ci / dependency-boundaries", "owner": "platform", "commands": ["validate-boundaries"]}
+    ],
+    "branch_protection_target": {
+      "pull_request_required": true,
+      "required_checks_strict": true,
+      "require_conversation_resolution": true,
+      "allow_force_pushes": false,
+      "allow_deletions": false,
+      "bootstrap_reviews": {
+        "minimum_approvals": 0,
+        "reason": "single verified GitHub owner cannot approve their own pull request",
+        "promotion_gate": "set minimum approvals to 1 and require code-owner review when a second verified reviewer or team exists"
+      }
+    },
+    "security_rules": [
+      "pull_request_jobs_receive_no_production_secrets",
+      "fork_jobs_receive_no_repository_secrets",
+      "third_party_actions_are_pinned_to_reviewed_immutable_revisions",
+      "self_hosted_production_runner_is_not_used_for_untrusted_pull_requests",
+      "artifacts_contain_no_secrets_or_personal_data",
+      "deployment_requires_a_separate_approved_workflow_and_main_commit"
+    ]
+  },
+  "access_matrix": [
+    {"actor": "pull_request_author", "allow": ["propose_change", "read_check_results"], "deny": ["bypass_required_checks", "read_production_secrets", "deploy_production"]},
+    {"actor": "code_owner", "allow": ["review_owned_paths", "request_changes"], "deny": ["disable_security_checks", "approve_own_change_as_independent_review"]},
+    {"actor": "repository_admin", "allow": ["manage_reviewed_rules", "document_emergency_bypass"], "deny": ["silent_bypass", "force_push_main"]},
+    {"actor": "github_hosted_pr_runner", "allow": ["read_source", "run_required_checks", "publish_sanitized_results"], "deny": ["production_secret_access", "production_database_access", "production_deploy"]},
+    {"actor": "production_runner", "allow": ["run_separately_approved_allowlisted_deployment"], "deny": ["run_untrusted_pr_code", "arbitrary_root_shell"]},
+    {"actor": "backend_runtime", "allow": ["owned_domain_repository", "versioned_contracts"], "deny": ["foreign_domain_table_write", "frontend_source_import"]},
+    {"actor": "frontend_runtime", "allow": ["versioned_http_client", "shared_presentation_contracts"], "deny": ["domain_database_access", "backend_internal_import"]}
+  ],
+  "acceptance_scenarios": [
+    {"id": "four-runtime-units-owned", "expected": "accepted"},
+    {"id": "all-runtime-commands-present", "expected": "accepted"},
+    {"id": "all-owned-paths-have-codeowner", "expected": "accepted"},
+    {"id": "duplicate-runtime-path", "expected": "rejected", "error": "DUPLICATE_WORKSPACE_PATH"},
+    {"id": "frontend-imports-backend-internal", "expected": "rejected", "error": "FORBIDDEN_DEPENDENCY"},
+    {"id": "missing-required-check", "expected": "rejected", "error": "REQUIRED_CHECK_MISSING"},
+    {"id": "pull-request-secret-access", "expected": "rejected", "error": "PR_SECRET_ACCESS_DENIED"},
+    {"id": "ci-production-database-write", "expected": "rejected", "error": "CI_PRODUCTION_ACCESS_DENIED"},
+    {"id": "production-deploy-from-pr", "expected": "rejected", "error": "DEPLOYMENT_APPROVAL_REQUIRED"}
+  ],
+  "rollback": {
+    "strategy": "reviewed Git revert before runtime implementation",
+    "runtime_action_required": false,
+    "database_action_required": false
+  }
+}
