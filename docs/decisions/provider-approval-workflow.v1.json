@@ -1,0 +1,374 @@
+{
+  "schema_version": "1.0",
+  "workflow_id": "S01-W04-T02",
+  "version": "1.0.0",
+  "status": "accepted_operating_model",
+  "approved_at": "2026-11-24",
+  "requirement_ids": ["SEC-002"],
+  "source_contract": {
+    "path": "docs/contracts/S01-W04.json",
+    "contract_id": "S01-W04",
+    "version": "1.0.0"
+  },
+  "safety_boundary": {
+    "planning_records_complete": true,
+    "external_legal_decisions_complete": false,
+    "provider_selection_complete": false,
+    "production_activation_permitted": false,
+    "default": "deny",
+    "stable_error": "PROVIDER_ACTIVATION_GATES_INCOMPLETE",
+    "notice": "This workflow records review state; it does not replace legal advice, signed contracts, approved budgets or production approval."
+  },
+  "state_model": {
+    "initial_state": "evidence_collecting",
+    "terminal_states": ["activated", "revoked"],
+    "states": [
+      "evidence_collecting",
+      "ready_for_review",
+      "in_review",
+      "approved",
+      "activation_requested",
+      "activated",
+      "suspended",
+      "revoked"
+    ],
+    "transitions": [
+      {
+        "from": "evidence_collecting",
+        "to": "ready_for_review",
+        "actor": "decision_owner",
+        "gate": "all_required_evidence_refs_present"
+      },
+      {
+        "from": "ready_for_review",
+        "to": "in_review",
+        "actor": "configured_approver",
+        "gate": "evidence_manifest_integrity_valid"
+      },
+      {
+        "from": "in_review",
+        "to": "approved",
+        "actor": "workflow_engine",
+        "gate": "all_configured_approvals_recorded"
+      },
+      {
+        "from": "approved",
+        "to": "activation_requested",
+        "actor": "decision_owner",
+        "gate": "external_value_and_activation_gates_complete"
+      },
+      {
+        "from": "activation_requested",
+        "to": "activated",
+        "actor": "platform_owner",
+        "gate": "separate_production_change_approved"
+      },
+      {
+        "from": "approved",
+        "to": "evidence_collecting",
+        "actor": "configured_approver",
+        "gate": "material_evidence_changed"
+      },
+      {
+        "from": "activated",
+        "to": "suspended",
+        "actor": "security_or_legal_owner",
+        "gate": "incident_or_contract_risk_recorded"
+      },
+      {
+        "from": "suspended",
+        "to": "activation_requested",
+        "actor": "decision_owner",
+        "gate": "remediation_evidence_approved"
+      },
+      {
+        "from": "evidence_collecting",
+        "to": "revoked",
+        "actor": "decision_owner",
+        "gate": "decision_cancelled_with_reason"
+      },
+      {
+        "from": "approved",
+        "to": "revoked",
+        "actor": "decision_owner",
+        "gate": "decision_cancelled_with_reason"
+      },
+      {
+        "from": "suspended",
+        "to": "revoked",
+        "actor": "decision_owner",
+        "gate": "contract_or_legal_basis_ended"
+      }
+    ]
+  },
+  "evidence_policy": {
+    "storage": "approved_private_evidence_store",
+    "repository_content": "metadata_and_hash_only",
+    "required_metadata": [
+      "evidence_type",
+      "opaque_reference",
+      "sha256",
+      "issued_at",
+      "expires_at",
+      "submitted_by",
+      "classification"
+    ],
+    "forbidden_content": [
+      "raw_contract_document",
+      "child_pii",
+      "provider_secret",
+      "bank_credential",
+      "raw_biometric_template"
+    ],
+    "append_only_history": true,
+    "replacement_requires_new_version": true,
+    "expired_evidence_blocks_activation": true
+  },
+  "approval_policy": {
+    "all_configured_approvers_required": true,
+    "minimum_distinct_approver_roles": 3,
+    "approval_record_fields": [
+      "decision_id",
+      "decision_version",
+      "approver_role",
+      "actor_id",
+      "evidence_manifest_hash",
+      "approved_at",
+      "expires_at",
+      "comment_ref"
+    ],
+    "approval_is_version_bound": true,
+    "evidence_change_invalidates_approvals": true,
+    "role_impersonation_forbidden": true,
+    "decision_owner_cannot_supply_other_approvals": true
+  },
+  "operational_steps": [
+    {
+      "order": 1,
+      "id": "open_case",
+      "owner": "decision_owner",
+      "output": "versioned_case_in_evidence_collecting"
+    },
+    {
+      "order": 2,
+      "id": "attach_evidence_manifest",
+      "owner": "decision_owner",
+      "output": "metadata_and_hash_refs_only"
+    },
+    {
+      "order": 3,
+      "id": "validate_completeness",
+      "owner": "workflow_engine",
+      "output": "ready_for_review_or_missing_evidence_codes"
+    },
+    {
+      "order": 4,
+      "id": "collect_distinct_approvals",
+      "owner": "configured_approvers",
+      "output": "version_bound_approval_records"
+    },
+    {
+      "order": 5,
+      "id": "record_external_value",
+      "owner": "decision_owner",
+      "output": "legal_or_provider_value_with_effective_date"
+    },
+    {
+      "order": 6,
+      "id": "evaluate_activation_gates",
+      "owner": "workflow_engine",
+      "output": "deny_reasons_or_activation_eligible"
+    },
+    {
+      "order": 7,
+      "id": "request_separate_production_change",
+      "owner": "platform_owner",
+      "output": "reviewed_change_reference"
+    },
+    {
+      "order": 8,
+      "id": "activate_and_monitor",
+      "owner": "platform_owner",
+      "output": "audited_activation_receipt"
+    }
+  ],
+  "decision_cases": [
+    {
+      "id": "child_data_residency",
+      "case_type": "privacy",
+      "state": "evidence_collecting",
+      "decision_owner": "legal_privacy_owner",
+      "approvers": ["legal_privacy_owner", "security_owner", "product_owner"],
+      "planning_due_at": "2026-12-08",
+      "required_evidence": [
+        "approved_jurisdiction",
+        "processing_location",
+        "transfer_assessment",
+        "retention_schedule",
+        "deletion_and_export_process"
+      ],
+      "external_value": {
+        "jurisdiction": null,
+        "legal_basis": null,
+        "processing_locations": [],
+        "cross_border_transfer_approved": false,
+        "effective_at": null
+      },
+      "activation_permitted": false,
+      "failure_code": "CHILD_DATA_LOCATION_UNAPPROVED"
+    },
+    {
+      "id": "guardian_consent",
+      "case_type": "privacy",
+      "state": "evidence_collecting",
+      "decision_owner": "legal_privacy_owner",
+      "approvers": ["legal_privacy_owner", "security_owner", "product_owner"],
+      "planning_due_at": "2026-12-08",
+      "required_evidence": [
+        "verified_guardian_relation",
+        "versioned_consent_notice",
+        "purpose_and_scope",
+        "revocation_process",
+        "audit_and_evidence_retention"
+      ],
+      "external_value": {
+        "policy_version": null,
+        "notice_hash": null,
+        "legal_basis": null,
+        "minimum_age_rule": null,
+        "effective_at": null
+      },
+      "activation_permitted": false,
+      "failure_code": "CONSENT_POLICY_UNAPPROVED"
+    },
+    {
+      "id": "payment_gateway",
+      "case_type": "provider",
+      "state": "evidence_collecting",
+      "decision_owner": "finance_owner",
+      "approvers": ["finance_owner", "security_owner", "platform_owner"],
+      "planning_due_at": "2026-12-15",
+      "required_evidence": ["signed_contract", "sandbox_poc", "server_verification", "reconciliation_plan", "approved_budget"],
+      "provider_record_id": "provider:payment_gateway:v1",
+      "activation_permitted": false,
+      "failure_code": "PAYMENT_PROVIDER_NOT_APPROVED"
+    },
+    {
+      "id": "sms_provider",
+      "case_type": "provider",
+      "state": "evidence_collecting",
+      "decision_owner": "product_owner",
+      "approvers": ["product_owner", "security_owner", "platform_owner"],
+      "planning_due_at": "2026-12-15",
+      "required_evidence": ["signed_contract", "sandbox_poc", "data_processing_terms", "delivery_and_retry_limits", "approved_budget"],
+      "provider_record_id": "provider:sms_provider:v1",
+      "activation_permitted": false,
+      "failure_code": "SMS_PROVIDER_NOT_APPROVED"
+    },
+    {
+      "id": "object_storage",
+      "case_type": "provider",
+      "state": "evidence_collecting",
+      "decision_owner": "platform_owner",
+      "approvers": ["platform_owner", "security_owner", "legal_privacy_owner"],
+      "planning_due_at": "2026-12-15",
+      "required_evidence": ["signed_contract", "sandbox_poc", "processing_location", "private_acl_and_encryption", "deletion_propagation", "approved_budget"],
+      "provider_record_id": "provider:object_storage:v1",
+      "activation_permitted": false,
+      "failure_code": "STORAGE_PROVIDER_NOT_APPROVED"
+    },
+    {
+      "id": "attendance_device",
+      "case_type": "provider",
+      "state": "evidence_collecting",
+      "decision_owner": "product_owner",
+      "approvers": ["product_owner", "security_owner", "legal_privacy_owner"],
+      "planning_due_at": "2026-12-15",
+      "required_evidence": ["signed_contract", "sandbox_poc", "signed_event_protocol", "no_raw_biometric_template", "dedupe_and_clock_policy", "approved_budget"],
+      "provider_record_id": "provider:attendance_device:v1",
+      "activation_permitted": false,
+      "failure_code": "ATTENDANCE_DEVICE_NOT_APPROVED"
+    },
+    {
+      "id": "school_finance_integration",
+      "case_type": "provider",
+      "state": "evidence_collecting",
+      "decision_owner": "finance_owner",
+      "approvers": ["finance_owner", "security_owner", "integration_owner"],
+      "planning_due_at": "2026-12-15",
+      "required_evidence": ["signed_contract", "api_documentation", "read_only_poc", "data_mapping_and_reconciliation", "scoped_credentials", "approved_budget"],
+      "provider_record_id": "provider:school_finance_integration:v1",
+      "activation_permitted": false,
+      "failure_code": "FINANCE_INTEGRATION_NOT_APPROVED"
+    }
+  ],
+  "provider_records": [
+    {
+      "id": "provider:payment_gateway:v1",
+      "type": "payment_gateway",
+      "decision_id": "payment_gateway",
+      "contract": {"status": "unsigned", "opaque_reference": null, "signed_at": null, "expires_at": null},
+      "budget": {"status": "unapproved", "owner": "finance_owner", "amount_minor": null, "currency": "IRR", "period": null},
+      "poc": {"status": "not_run", "environment": "sandbox", "evidence_ref": null},
+      "processing_location": "TBD",
+      "secret_reference": null,
+      "activation": {"status": "denied", "change_reference": null, "activated_at": null}
+    },
+    {
+      "id": "provider:sms_provider:v1",
+      "type": "sms_provider",
+      "decision_id": "sms_provider",
+      "contract": {"status": "unsigned", "opaque_reference": null, "signed_at": null, "expires_at": null},
+      "budget": {"status": "unapproved", "owner": "finance_owner", "amount_minor": null, "currency": "IRR", "period": null},
+      "poc": {"status": "not_run", "environment": "sandbox", "evidence_ref": null},
+      "processing_location": "TBD",
+      "secret_reference": null,
+      "activation": {"status": "denied", "change_reference": null, "activated_at": null}
+    },
+    {
+      "id": "provider:object_storage:v1",
+      "type": "object_storage",
+      "decision_id": "object_storage",
+      "contract": {"status": "unsigned", "opaque_reference": null, "signed_at": null, "expires_at": null},
+      "budget": {"status": "unapproved", "owner": "finance_owner", "amount_minor": null, "currency": "IRR", "period": null},
+      "poc": {"status": "not_run", "environment": "sandbox", "evidence_ref": null},
+      "processing_location": "TBD",
+      "secret_reference": null,
+      "activation": {"status": "denied", "change_reference": null, "activated_at": null}
+    },
+    {
+      "id": "provider:attendance_device:v1",
+      "type": "attendance_device",
+      "decision_id": "attendance_device",
+      "contract": {"status": "unsigned", "opaque_reference": null, "signed_at": null, "expires_at": null},
+      "budget": {"status": "unapproved", "owner": "finance_owner", "amount_minor": null, "currency": "IRR", "period": null},
+      "poc": {"status": "not_run", "environment": "sandbox", "evidence_ref": null},
+      "processing_location": "TBD",
+      "secret_reference": null,
+      "activation": {"status": "denied", "change_reference": null, "activated_at": null}
+    },
+    {
+      "id": "provider:school_finance_integration:v1",
+      "type": "school_finance_integration",
+      "decision_id": "school_finance_integration",
+      "contract": {"status": "unsigned", "opaque_reference": null, "signed_at": null, "expires_at": null},
+      "budget": {"status": "unapproved", "owner": "finance_owner", "amount_minor": null, "currency": "IRR", "period": null},
+      "poc": {"status": "not_run", "environment": "sandbox", "evidence_ref": null},
+      "processing_location": "TBD",
+      "secret_reference": null,
+      "activation": {"status": "denied", "change_reference": null, "activated_at": null}
+    }
+  ],
+  "deadline_policy": {
+    "timezone": "UTC",
+    "warning_days_before_due": [7, 3, 1],
+    "overdue_action": "remain_denied_and_escalate_to_decision_owner",
+    "deadline_is_not_automatic_approval": true
+  },
+  "audit_policy": {
+    "required_fields": ["request_id", "actor_id", "actor_role", "decision_id", "decision_version", "from_state", "to_state", "occurred_at", "reason_code"],
+    "pii_in_audit_log_allowed": false,
+    "secret_in_audit_log_allowed": false,
+    "immutable_receipt_required": true
+  }
+}
