@@ -1,0 +1,196 @@
+{
+  "schema_version": "1.0",
+  "gate_id": "S01-W05-T01",
+  "version": "1.0.0",
+  "stage_id": "S01",
+  "status": "accepted",
+  "evaluated_at": "2026-11-24",
+  "evaluated_source_sha": "a3bf30983d02836ebbad91485b1bd2d3a02cd0d2",
+  "requirement_ids": ["OPS-001"],
+  "decision": "GO_TO_S02_FOUNDATION",
+  "production_authorization": false,
+  "provider_activation_authorization": false,
+  "scope_notice": "This gate closes S01 engineering evidence only; it does not approve production, legal conclusions, budgets, contracts or providers.",
+  "dependency_evidence": [
+    {
+      "work_id": "S01-W01",
+      "terminal_task": "S01-W01-T03",
+      "status": "done",
+      "source_commit": "8bbea24233dde1152312e642cd089331a99f1337",
+      "control_commit": "c5a2408247d050e639764d1c431313eecdc4860a",
+      "log": "logs/S01-W01-T03/attempt-001.md",
+      "automated_tests": 5,
+      "evidence_summary": "source authority, P0-P3 gates and tenant role isolation"
+    },
+    {
+      "work_id": "S01-W02",
+      "terminal_task": "S01-W02-T03",
+      "status": "done",
+      "source_commit": "0decaea52d35ea5a1d82053085a7a00cd274777b",
+      "control_commit": "d026cd82b5793915579cfce6e46bf380f741203b",
+      "log": "logs/S01-W02-T03/attempt-001.md",
+      "automated_tests": 6,
+      "evidence_summary": "commercial journey, payment replay and cross-tenant organization isolation"
+    },
+    {
+      "work_id": "S01-W03",
+      "terminal_task": "S01-W03-T03",
+      "status": "done",
+      "source_commit": "98236b6a4fdfa2207f375e36943bb03201989ce0",
+      "control_commit": "1c5ff084f5fc09f350c0585a8c8426c16fbf9f67",
+      "log": "logs/S01-W03-T03/attempt-001.md",
+      "automated_tests": 7,
+      "evidence_summary": "service ownership, pool reset, replay safety and non-automatic split"
+    },
+    {
+      "work_id": "S01-W04",
+      "terminal_task": "S01-W04-T03",
+      "status": "done",
+      "source_commit": "a3bf30983d02836ebbad91485b1bd2d3a02cd0d2",
+      "control_commit": "e6b662d7f41efe89195db71e709b7f2d6ed231bf",
+      "log": "logs/S01-W04-T03/attempt-001.md",
+      "automated_tests": 14,
+      "evidence_summary": "child data and provider governance with tenant and activation boundaries"
+    }
+  ],
+  "validators": [
+    {
+      "command": "node scripts/validate-commercial-journey-contract.mjs",
+      "status": "passed"
+    },
+    {
+      "command": "node scripts/validate-commercial-journey-prd.mjs",
+      "status": "passed"
+    },
+    {
+      "command": "node scripts/validate-service-boundary-contract.mjs",
+      "status": "passed"
+    },
+    {
+      "command": "node scripts/validate-service-boundary-operating-model.mjs",
+      "status": "passed"
+    },
+    {
+      "command": "node scripts/validate-provider-governance-contract.mjs",
+      "status": "passed"
+    },
+    {
+      "command": "node scripts/validate-provider-approval-workflow.mjs",
+      "status": "passed"
+    }
+  ],
+  "test_suites": [
+    {
+      "path": "tests/S01-W01/priority-baseline.test.mjs",
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "path": "tests/S01-W02/commercial-journey.boundary.test.mjs",
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "path": "tests/S01-W03/service-boundary.boundary.test.mjs",
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "path": "tests/S01-W04/provider-approval.boundary.test.mjs",
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0
+    }
+  ],
+  "tenant_isolation_evidence": [
+    {
+      "work_id": "S01-W01",
+      "scenario": "inactive tenant membership",
+      "expected_error": "TENANT_CONTEXT_MISMATCH",
+      "state_mutation": false,
+      "data_leak_detected": false
+    },
+    {
+      "work_id": "S01-W02",
+      "scenario": "second tenant uses first tenant parent or school scope",
+      "expected_error": "NON_DISCLOSING_NOT_FOUND",
+      "state_mutation": false,
+      "data_leak_detected": false
+    },
+    {
+      "work_id": "S01-W03",
+      "scenario": "connection pool reused across tenant A and tenant B",
+      "expected_error": "TENANT_CONTEXT_RESET_REQUIRED",
+      "state_mutation": false,
+      "data_leak_detected": false
+    },
+    {
+      "work_id": "S01-W04",
+      "scenario": "tenant beta submits evidence or guardian relation for tenant alpha",
+      "expected_error": "TENANT_CONTEXT_MISMATCH_OR_CONSENT_REQUIRED",
+      "state_mutation": false,
+      "data_leak_detected": false
+    }
+  ],
+  "exit_criteria": [
+    {
+      "id": "source_priority_traceable",
+      "status": "passed",
+      "evidence": "S01-W01 accepted baseline and five tests"
+    },
+    {
+      "id": "commercial_journey_reviewable",
+      "status": "passed",
+      "evidence": "S01-W02 contract, PRD and six boundary tests"
+    },
+    {
+      "id": "service_boundaries_owned",
+      "status": "passed",
+      "evidence": "S01-W03 contract, operating model and seven boundary tests"
+    },
+    {
+      "id": "child_data_and_provider_decisions_guarded",
+      "status": "passed",
+      "evidence": "S01-W04 contract, workflow and fourteen boundary tests"
+    },
+    {
+      "id": "no_cross_tenant_leak_in_s01_scenarios",
+      "status": "passed",
+      "evidence": "four independent tenant isolation scenarios with no mutation or disclosure"
+    }
+  ],
+  "guarded_open_decisions": [
+    {
+      "id": "child_data_legal_basis_and_location",
+      "status": "unresolved",
+      "blocks": ["production_child_data_processing", "cross_border_transfer"],
+      "does_not_block": ["S02_foundation_engineering"]
+    },
+    {
+      "id": "guardian_consent_policy",
+      "status": "unresolved",
+      "blocks": ["production_guardian_consent_collection"],
+      "does_not_block": ["S02_foundation_engineering"]
+    },
+    {
+      "id": "provider_contracts_budgets_and_pocs",
+      "status": "unresolved",
+      "blocks": ["provider_activation", "production_provider_traffic"],
+      "does_not_block": ["S02_foundation_engineering"]
+    }
+  ],
+  "summary": {
+    "completed_works": 4,
+    "validators_passed": 6,
+    "automated_tests_passed": 32,
+    "automated_tests_failed": 0,
+    "automated_tests_skipped": 0,
+    "tenant_leaks_detected": 0,
+    "critical_blockers": 0
+  },
+  "next_task": "S02-W01-T01",
+  "rollback": "Reopen S01-W05-T01 and replace this gate report with a new reviewed evidence version; no production rollback is required."
+}
