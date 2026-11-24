@@ -1,0 +1,267 @@
+{
+  "schema_version": "1.0",
+  "contract_id": "S01-W04",
+  "version": "1.0.0",
+  "status": "accepted_governance_contract",
+  "approved_at": "2026-11-24",
+  "requirement_ids": ["SEC-002"],
+  "legal_position": {
+    "jurisdiction": "TBD_BY_LEGAL_COUNSEL",
+    "legal_basis": "TBD_BY_LEGAL_COUNSEL",
+    "child_minimum_age_rule": "TBD_BY_LEGAL_COUNSEL",
+    "cross_border_transfer": "DENY_UNTIL_APPROVED",
+    "production_activation": "DENY_UNTIL_ALL_EVIDENCE_APPROVED",
+    "notice": "This engineering contract does not replace legal advice."
+  },
+  "decision_registry": [
+    {
+      "id": "child_data_residency",
+      "category": "privacy",
+      "status": "pending_evidence",
+      "decision_owner": "legal_privacy_owner",
+      "approvers": ["legal_privacy_owner", "security_owner", "product_owner"],
+      "planning_due_at": "2026-12-08",
+      "activation_permitted": false,
+      "failure_code": "CHILD_DATA_LOCATION_UNAPPROVED",
+      "required_evidence": ["approved_jurisdiction", "processing_location", "transfer_assessment", "retention_schedule", "deletion_and_export_process"]
+    },
+    {
+      "id": "guardian_consent",
+      "category": "privacy",
+      "status": "pending_evidence",
+      "decision_owner": "legal_privacy_owner",
+      "approvers": ["legal_privacy_owner", "security_owner", "product_owner"],
+      "planning_due_at": "2026-12-08",
+      "activation_permitted": false,
+      "failure_code": "CONSENT_POLICY_UNAPPROVED",
+      "required_evidence": ["verified_guardian_relation", "versioned_consent_notice", "purpose_and_scope", "revocation_process", "audit_and_evidence_retention"]
+    },
+    {
+      "id": "payment_gateway",
+      "category": "provider",
+      "status": "pending_evidence",
+      "decision_owner": "finance_owner",
+      "approvers": ["finance_owner", "security_owner", "platform_owner"],
+      "planning_due_at": "2026-12-15",
+      "activation_permitted": false,
+      "failure_code": "PAYMENT_PROVIDER_NOT_APPROVED",
+      "required_evidence": ["signed_contract", "sandbox_poc", "server_verification", "reconciliation_plan", "approved_budget"]
+    },
+    {
+      "id": "sms_provider",
+      "category": "provider",
+      "status": "pending_evidence",
+      "decision_owner": "product_owner",
+      "approvers": ["product_owner", "security_owner", "platform_owner"],
+      "planning_due_at": "2026-12-15",
+      "activation_permitted": false,
+      "failure_code": "SMS_PROVIDER_NOT_APPROVED",
+      "required_evidence": ["signed_contract", "sandbox_poc", "data_processing_terms", "delivery_and_retry_limits", "approved_budget"]
+    },
+    {
+      "id": "object_storage",
+      "category": "provider",
+      "status": "pending_evidence",
+      "decision_owner": "platform_owner",
+      "approvers": ["platform_owner", "security_owner", "legal_privacy_owner"],
+      "planning_due_at": "2026-12-15",
+      "activation_permitted": false,
+      "failure_code": "STORAGE_PROVIDER_NOT_APPROVED",
+      "required_evidence": ["signed_contract", "sandbox_poc", "processing_location", "private_acl_and_encryption", "deletion_propagation", "approved_budget"]
+    },
+    {
+      "id": "attendance_device",
+      "category": "provider",
+      "status": "pending_evidence",
+      "decision_owner": "product_owner",
+      "approvers": ["product_owner", "security_owner", "legal_privacy_owner"],
+      "planning_due_at": "2026-12-15",
+      "activation_permitted": false,
+      "failure_code": "ATTENDANCE_DEVICE_NOT_APPROVED",
+      "required_evidence": ["signed_contract", "sandbox_poc", "signed_event_protocol", "no_raw_biometric_template", "dedupe_and_clock_policy", "approved_budget"]
+    },
+    {
+      "id": "school_finance_integration",
+      "category": "provider",
+      "status": "pending_evidence",
+      "decision_owner": "finance_owner",
+      "approvers": ["finance_owner", "security_owner", "integration_owner"],
+      "planning_due_at": "2026-12-15",
+      "activation_permitted": false,
+      "failure_code": "FINANCE_INTEGRATION_NOT_APPROVED",
+      "required_evidence": ["signed_contract", "api_documentation", "read_only_poc", "data_mapping_and_reconciliation", "scoped_credentials", "approved_budget"]
+    }
+  ],
+  "child_data_policy": {
+    "classification": "highly_sensitive",
+    "tenant_scoped": true,
+    "data_minimization_required": true,
+    "verified_guardian_relation_required": true,
+    "raw_biometric_template_in_saas": false,
+    "public_file_url_allowed": false,
+    "pii_in_logs_allowed": false,
+    "processing_location_must_be_recorded": true,
+    "retention_values": "TBD_BY_LEGAL_AND_CONTRACT",
+    "export_and_deletion_must_be_audited": true
+  },
+  "consent_contract": {
+    "owner": "school",
+    "context": "school_enrollment",
+    "policy_owner": "fields",
+    "policy_context": "people_fields",
+    "required_fields": [
+      "tenant_id",
+      "student_person_id",
+      "guardian_person_id",
+      "verified_guardian_link_id",
+      "purpose",
+      "scope",
+      "policy_version",
+      "notice_hash",
+      "granted_at",
+      "expires_at",
+      "revoked_at",
+      "evidence_ref"
+    ],
+    "rules": [
+      "consent_is_purpose_specific",
+      "consent_is_versioned",
+      "guardian_relation_is_verified_before_grant",
+      "revocation_blocks_new_processing",
+      "financial_and_audit_retention_exceptions_are_documented",
+      "evidence_ref_never_contains_raw_document_or_secret"
+    ],
+    "missing_or_invalid_error": "CONSENT_REQUIRED"
+  },
+  "provider_contracts": [
+    {
+      "type": "payment_gateway",
+      "context": "commercial_billing",
+      "mode": "verified_write",
+      "allowed_data": ["invoice_id", "amount_minor", "currency", "provider_reference"],
+      "forbidden_data": ["card_number", "cvv", "raw_bank_credentials"],
+      "credential_storage": "secret_manager_reference_only",
+      "processing_location": "TBD",
+      "contract_status": "unsigned",
+      "poc_status": "not_run",
+      "budget": {"status": "unapproved", "amount_minor": null, "currency": "IRR"},
+      "activation_gates": ["signed_contract", "sandbox_poc", "server_to_server_verification", "idempotency", "reconciliation", "approved_budget"],
+      "failure_code": "PAYMENT_PROVIDER_NOT_APPROVED"
+    },
+    {
+      "type": "sms_provider",
+      "context": "notifications_integrations",
+      "mode": "outbound_only",
+      "allowed_data": ["masked_recipient_ref", "template_id", "minimal_parameters", "delivery_reference"],
+      "forbidden_data": ["raw_child_profile", "health_record", "unbounded_message_log"],
+      "credential_storage": "secret_manager_reference_only",
+      "processing_location": "TBD",
+      "contract_status": "unsigned",
+      "poc_status": "not_run",
+      "budget": {"status": "unapproved", "amount_minor": null, "currency": "IRR"},
+      "activation_gates": ["signed_contract", "sandbox_poc", "data_processing_terms", "rate_and_quiet_hours", "retention_ttl", "approved_budget"],
+      "failure_code": "SMS_PROVIDER_NOT_APPROVED"
+    },
+    {
+      "type": "object_storage",
+      "context": "assets",
+      "mode": "private_objects",
+      "allowed_data": ["opaque_object_key", "encrypted_object", "sha256", "content_type", "size_bytes"],
+      "forbidden_data": ["public_private_asset_url", "predictable_object_key", "inline_secret"],
+      "credential_storage": "secret_manager_reference_only",
+      "processing_location": "TBD",
+      "contract_status": "unsigned",
+      "poc_status": "not_run",
+      "budget": {"status": "unapproved", "amount_minor": null, "currency": "IRR"},
+      "activation_gates": ["signed_contract", "sandbox_poc", "approved_processing_location", "private_acl", "encryption", "deletion_propagation", "approved_budget"],
+      "failure_code": "STORAGE_PROVIDER_NOT_APPROVED"
+    },
+    {
+      "type": "attendance_device",
+      "context": "attendance",
+      "mode": "signed_event_ingest",
+      "allowed_data": ["device_id", "external_event_id", "occurred_at", "subject_reference"],
+      "forbidden_data": ["raw_biometric_template", "biometric_image", "device_admin_secret"],
+      "credential_storage": "secret_manager_reference_only",
+      "processing_location": "TBD",
+      "contract_status": "unsigned",
+      "poc_status": "not_run",
+      "budget": {"status": "unapproved", "amount_minor": null, "currency": "IRR"},
+      "activation_gates": ["signed_contract", "sandbox_poc", "signed_event_protocol", "no_raw_biometrics", "dedupe", "human_confirmation_policy", "approved_budget"],
+      "failure_code": "ATTENDANCE_DEVICE_NOT_APPROVED"
+    },
+    {
+      "type": "school_finance_integration",
+      "context": "commercial_billing",
+      "mode": "read_only_snapshot",
+      "allowed_data": ["external_account_reference", "balance_snapshot", "last_synced_at", "source_status"],
+      "forbidden_data": ["local_balance_write", "local_collection_write", "unscoped_finance_credential"],
+      "credential_storage": "secret_manager_reference_only",
+      "processing_location": "TBD",
+      "contract_status": "unsigned",
+      "poc_status": "not_run",
+      "budget": {"status": "unapproved", "amount_minor": null, "currency": "IRR"},
+      "activation_gates": ["signed_contract", "documented_api", "read_only_poc", "scoped_credentials", "stale_state_ui", "reconciliation", "approved_budget"],
+      "failure_code": "FINANCE_INTEGRATION_NOT_APPROVED"
+    }
+  ],
+  "table_ownership": [
+    {"table": "governance_decisions", "owner": "platform", "context": "platform_audit_jobs", "scope": "global_or_tenant", "mutability": "versioned"},
+    {"table": "decision_evidence", "owner": "platform", "context": "platform_audit_jobs", "scope": "global_or_tenant", "mutability": "append_only"},
+    {"table": "provider_contracts", "owner": "platform", "context": "platform_audit_jobs", "scope": "global", "mutability": "versioned"},
+    {"table": "provider_capability_versions", "owner": "platform", "context": "platform_audit_jobs", "scope": "global", "mutability": "immutable_version"},
+    {"table": "data_processing_register", "owner": "platform", "context": "platform_audit_jobs", "scope": "global_or_tenant", "mutability": "versioned"},
+    {"table": "consent_policies", "owner": "fields", "context": "people_fields", "scope": "tenant", "mutability": "immutable_version"},
+    {"table": "consent_records", "owner": "school", "context": "school_enrollment", "scope": "tenant", "mutability": "append_only_with_revocation"},
+    {"table": "integration_approvals", "owner": "platform", "context": "platform_audit_jobs", "scope": "global_or_tenant", "mutability": "versioned"}
+  ],
+  "api_contracts": [
+    {"operation_id": "listGovernanceDecisions", "method": "GET", "path": "/v1/governance/decisions", "owner_context": "platform_audit_jobs", "implementation_state": "contract_only_not_implemented"},
+    {"operation_id": "submitGovernanceEvidence", "method": "POST", "path": "/v1/governance/decisions/{id}/evidence", "owner_context": "platform_audit_jobs", "implementation_state": "contract_only_not_implemented"},
+    {"operation_id": "approveGovernanceDecision", "method": "POST", "path": "/v1/governance/decisions/{id}/approve", "owner_context": "platform_audit_jobs", "implementation_state": "contract_only_not_implemented"},
+    {"operation_id": "grantGuardianConsent", "method": "POST", "path": "/v1/consents", "owner_context": "school_enrollment", "implementation_state": "contract_only_not_implemented"},
+    {"operation_id": "revokeGuardianConsent", "method": "POST", "path": "/v1/consents/{id}/revoke", "owner_context": "school_enrollment", "implementation_state": "contract_only_not_implemented"},
+    {"operation_id": "listProviderContracts", "method": "GET", "path": "/v1/provider-contracts", "owner_context": "platform_audit_jobs", "implementation_state": "contract_only_not_implemented"},
+    {"operation_id": "registerProviderContract", "method": "POST", "path": "/v1/provider-contracts", "owner_context": "platform_audit_jobs", "implementation_state": "contract_only_not_implemented"},
+    {"operation_id": "reviewProviderCapability", "method": "POST", "path": "/v1/provider-contracts/{id}/capability-reviews", "owner_context": "platform_audit_jobs", "implementation_state": "contract_only_not_implemented"},
+    {"operation_id": "getProviderActivationEligibility", "method": "GET", "path": "/v1/provider-contracts/{id}/activation-eligibility", "owner_context": "platform_audit_jobs", "implementation_state": "contract_only_not_implemented"}
+  ],
+  "event_contracts": [
+    {"type": "governance.decision_approved.v1", "producer": "platform_audit_jobs", "consumers": ["platform_audit_jobs"], "dedupe_key": "decision_id+version"},
+    {"type": "consent.granted.v1", "producer": "school_enrollment", "consumers": ["platform_audit_jobs"], "dedupe_key": "consent_id+policy_version"},
+    {"type": "consent.revoked.v1", "producer": "school_enrollment", "consumers": ["platform_audit_jobs", "notifications_integrations"], "dedupe_key": "consent_id+revocation_revision"},
+    {"type": "provider.contract_status_changed.v1", "producer": "platform_audit_jobs", "consumers": ["commercial_billing", "assets", "attendance", "notifications_integrations"], "dedupe_key": "provider_contract_id+version"},
+    {"type": "provider.capability_changed.v1", "producer": "platform_audit_jobs", "consumers": ["commercial_billing", "assets", "attendance", "notifications_integrations"], "dedupe_key": "provider_capability_id+version"},
+    {"type": "provider.processing_location_changed.v1", "producer": "platform_audit_jobs", "consumers": ["platform_audit_jobs"], "dedupe_key": "processing_register_id+version"}
+  ],
+  "permission_matrix": [
+    {"actor": "legal_privacy_owner", "allow": ["review_child_data_basis", "approve_legal_decision", "review_processing_location"], "deny": ["approve_budget", "read_provider_secret", "alter_financial_ledger"]},
+    {"actor": "security_owner", "allow": ["review_security_evidence", "approve_security_gate", "review_secret_reference"], "deny": ["approve_legal_basis", "approve_budget", "read_raw_child_document"]},
+    {"actor": "finance_owner", "allow": ["approve_provider_budget", "review_payment_and_finance_contract"], "deny": ["approve_guardian_consent", "read_provider_secret", "write_school_balance_from_integration"]},
+    {"actor": "platform_owner", "allow": ["register_contract_metadata", "run_poc", "activate_after_all_gates"], "deny": ["self_approve_legal_gate", "self_approve_budget", "store_inline_secret"]},
+    {"actor": "integration_owner", "allow": ["review_api_capability", "run_scoped_poc", "record_reconciliation_result"], "deny": ["approve_legal_basis", "activate_without_contract", "write_unapproved_finance_data"]},
+    {"actor": "tenant_owner", "allow": ["request_provider_capability", "select_approved_consent_policy", "view_tenant_decision_status"], "deny": ["approve_platform_contract", "override_guardian_consent", "select_unapproved_provider"]},
+    {"actor": "verified_guardian", "allow": ["grant_purpose_specific_consent", "revoke_own_consent", "view_current_notice"], "deny": ["grant_for_unverified_relation", "approve_provider", "access_other_child_data"]},
+    {"actor": "runtime_worker", "allow": ["read_approved_capability", "resolve_secret_reference_at_runtime", "emit_audited_receipt"], "deny": ["read_contract_document", "persist_resolved_secret", "use_unapproved_capability"]}
+  ],
+  "activation_policy": {
+    "default": "deny",
+    "all_decision_approvals_required": true,
+    "signed_contract_required": true,
+    "poc_required": true,
+    "processing_location_required": true,
+    "approved_budget_required": true,
+    "secret_reference_required": true,
+    "stable_error": "PROVIDER_ACTIVATION_GATES_INCOMPLETE"
+  },
+  "acceptance_scenarios": [
+    {"id": "child-location-pending", "expected": "rejected", "error": "CHILD_DATA_LOCATION_UNAPPROVED"},
+    {"id": "guardian-consent-missing", "expected": "rejected", "error": "CONSENT_REQUIRED"},
+    {"id": "raw-biometric-template", "expected": "rejected", "error": "RAW_BIOMETRIC_TEMPLATE_FORBIDDEN"},
+    {"id": "provider-secret-inline", "expected": "rejected", "error": "PROVIDER_SECRET_INLINE_FORBIDDEN"},
+    {"id": "provider-budget-pending", "expected": "rejected", "error": "BUDGET_NOT_APPROVED"},
+    {"id": "finance-write-attempt", "expected": "rejected", "error": "FINANCE_WRITE_NOT_APPROVED"},
+    {"id": "unsigned-provider-contract", "expected": "rejected", "error": "PROVIDER_CONTRACT_NOT_APPROVED"},
+    {"id": "all-provider-gates-approved", "expected": "eligible_for_controlled_activation"}
+  ]
+}
