@@ -37,6 +37,7 @@ jobs:
         run: |
           node scripts/gateway-contract.mjs check "$PR_BASE_SHA"
           node --test apps/api-gateway/test/*.test.mjs
+          node --import tsx --test tests/S02-W02/gateway-acceptance.test.mjs
           corepack pnpm --filter @eduapp/contracts lint
           corepack pnpm --filter @eduapp/contracts typecheck
           corepack pnpm --filter @eduapp/contracts test

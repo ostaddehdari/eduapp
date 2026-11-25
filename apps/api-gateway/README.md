@@ -18,3 +18,5 @@ node scripts/gateway-contract.mjs generate
 node scripts/gateway-contract.mjs check
 node --test apps/api-gateway/test/*.test.mjs
 ```
+
+[راهنمای آزمون جداسازی دو مستأجر و خطاهای Gateway](../../tests/S02-W02/README.md)
