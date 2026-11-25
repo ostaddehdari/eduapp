@@ -1,0 +1,728 @@
+{
+  "schema_version": 1,
+  "contract_id": "S02-W03",
+  "task_id": "S02-W03-T01",
+  "version": "1.0.0",
+  "requirement_ids": [
+    "DATA-001"
+  ],
+  "sources": {
+    "ownership": "docs/contracts/S01-W03.json",
+    "runtime": "docs/architecture/service-boundary-operating-model.v1.json",
+    "gateway": "docs/contracts/S02-W02.json",
+    "openapi": "preview/api/openapi.json"
+  },
+  "ownership": [
+    {
+      "owner": "tenancy",
+      "context": "tenancy_organization",
+      "schema": "tenancy_organization",
+      "write_runtime": "api",
+      "tables": [
+        {
+          "name": "tenants",
+          "scope": "tenant_root",
+          "tenant_key": "id"
+        },
+        {
+          "name": "org_units",
+          "scope": "tenant",
+          "tenant_key": "tenant_id"
+        }
+      ]
+    },
+    {
+      "owner": "iam",
+      "context": "identity_access",
+      "schema": "identity_access",
+      "write_runtime": "api",
+      "tables": [
+        {
+          "name": "identities",
+          "scope": "owner_private_global",
+          "tenant_key": null
+        },
+        {
+          "name": "sessions",
+          "scope": "owner_private_global",
+          "tenant_key": null
+        }
+      ]
+    },
+    {
+      "owner": "people",
+      "context": "people_fields",
+      "schema": "people_fields",
+      "write_runtime": "api",
+      "tables": [
+        {
+          "name": "persons",
+          "scope": "tenant",
+          "tenant_key": "tenant_id"
+        }
+      ]
+    },
+    {
+      "owner": "access",
+      "context": "identity_access",
+      "schema": "identity_access",
+      "write_runtime": "api",
+      "tables": [
+        {
+          "name": "memberships",
+          "scope": "tenant",
+          "tenant_key": "tenant_id"
+        },
+        {
+          "name": "roles",
+          "scope": "tenant",
+          "tenant_key": "tenant_id"
+        },
+        {
+          "name": "role_bindings",
+          "scope": "tenant",
+          "tenant_key": "tenant_id"
+        }
+      ]
+    },
+    {
+      "owner": "fields",
+      "context": "people_fields",
+      "schema": "people_fields",
+      "write_runtime": "api",
+      "tables": [
+        {
+          "name": "field_definitions",
+          "scope": "tenant",
+          "tenant_key": "tenant_id"
+        },
+        {
+          "name": "field_values",
+          "scope": "tenant",
+          "tenant_key": "tenant_id"
+        }
+      ]
+    },
+    {
+      "owner": "billing",
+      "context": "commercial_billing",
+      "schema": "commercial_billing",
+      "write_runtime": "api",
+      "tables": [
+        {
+          "name": "plans",
+          "scope": "shared_catalog",
+          "tenant_key": null
+        },
+        {
+          "name": "plan_versions",
+          "scope": "shared_catalog",
+          "tenant_key": null
+        },
+        {
+          "name": "entitlements",
+          "scope": "tenant",
+          "tenant_key": "tenant_id"
+        },
+        {
+          "name": "subscriptions",
+          "scope": "tenant",
+          "tenant_key": "tenant_id"
+        },
+        {
+          "name": "invoices",
+          "scope": "tenant",
+          "tenant_key": "tenant_id"
+        },
+        {
+          "name": "payment_attempts",
+          "scope": "tenant",
+          "tenant_key": "tenant_id"
+        },
+        {
+          "name": "provider_events",
+          "scope": "owner_private_global",
+          "tenant_key": null
+        },
+        {
+          "name": "ledger_entries",
+          "scope": "tenant",
+          "tenant_key": "tenant_id",
+          "append_only": true
+        }
+      ]
+    },
+    {
+      "owner": "sites",
+      "context": "sites_content",
+      "schema": "sites_content",
+      "write_runtime": "api",
+      "tables": [
+        {
+          "name": "sites",
+          "scope": "tenant",
+          "tenant_key": "tenant_id"
+        },
+        {
+          "name": "domains",
+          "scope": "tenant",
+          "tenant_key": "tenant_id"
+        },
+        {
+          "name": "page_revisions",
+          "scope": "tenant",
+          "tenant_key": "tenant_id",
+          "append_only": true
+        }
+      ]
+    },
+    {
+      "owner": "assets",
+      "context": "assets",
+      "schema": "assets",
+      "write_runtime": "api_or_worker_via_owned_service",
+      "tables": [
+        {
+          "name": "media_assets",
+          "scope": "tenant",
+          "tenant_key": "tenant_id"
+        },
+        {
+          "name": "upload_sessions",
+          "scope": "tenant",
+          "tenant_key": "tenant_id"
+        }
+      ]
+    },
+    {
+      "owner": "school",
+      "context": "school_enrollment",
+      "schema": "school_enrollment",
+      "write_runtime": "api",
+      "tables": [
+        {
+          "name": "schools",
+          "scope": "tenant",
+          "tenant_key": "tenant_id"
+        },
+        {
+          "name": "academic_years",
+          "scope": "tenant",
+          "tenant_key": "tenant_id"
+        },
+        {
+          "name": "class_groups",
+          "scope": "tenant",
+          "tenant_key": "tenant_id"
+        },
+        {
+          "name": "enrollments",
+          "scope": "tenant",
+          "tenant_key": "tenant_id"
+        },
+        {
+          "name": "guardian_links",
+          "scope": "tenant",
+          "tenant_key": "tenant_id"
+        }
+      ]
+    },
+    {
+      "owner": "attendance",
+      "context": "attendance",
+      "schema": "attendance",
+      "write_runtime": "api_or_worker_via_owned_service",
+      "tables": [
+        {
+          "name": "device_events",
+          "scope": "tenant",
+          "tenant_key": "tenant_id"
+        },
+        {
+          "name": "attendance_records",
+          "scope": "tenant",
+          "tenant_key": "tenant_id"
+        },
+        {
+          "name": "attendance_revisions",
+          "scope": "tenant",
+          "tenant_key": "tenant_id",
+          "append_only": true
+        }
+      ]
+    },
+    {
+      "owner": "notifications",
+      "context": "notifications_integrations",
+      "schema": "notifications_integrations",
+      "write_runtime": "api_or_worker_via_owned_service",
+      "tables": [
+        {
+          "name": "message_jobs",
+          "scope": "tenant",
+          "tenant_key": "tenant_id"
+        },
+        {
+          "name": "message_attempts",
+          "scope": "tenant",
+          "tenant_key": "tenant_id"
+        }
+      ]
+    },
+    {
+      "owner": "platform",
+      "context": "platform_audit_jobs",
+      "schema": "platform_audit_jobs",
+      "write_runtime": "worker",
+      "tables": [
+        {
+          "name": "outbox_events",
+          "scope": "tenant",
+          "tenant_key": "tenant_id"
+        },
+        {
+          "name": "inbox_dedup",
+          "scope": "tenant",
+          "tenant_key": "tenant_id"
+        },
+        {
+          "name": "audit_events",
+          "scope": "tenant",
+          "tenant_key": "tenant_id",
+          "append_only": true
+        }
+      ]
+    }
+  ],
+  "roles": {
+    "api_owner_runtime": {
+      "login": true,
+      "superuser": false,
+      "bypass_rls": false,
+      "owns_tables": false,
+      "can_assume_privileged_role": false,
+      "grants": "owner_service_only"
+    },
+    "worker_owner_runtime": {
+      "login": true,
+      "superuser": false,
+      "bypass_rls": false,
+      "owns_tables": false,
+      "can_assume_privileged_role": false,
+      "grants": "owner_service_only"
+    },
+    "schema_owner": {
+      "login": false,
+      "superuser": false,
+      "bypass_rls": false,
+      "owns_tables": true,
+      "grants": "owned_schema_ddl"
+    },
+    "migration_runner": {
+      "login": true,
+      "superuser": false,
+      "bypass_rls": false,
+      "owns_tables": false,
+      "can_assume_privileged_role": true,
+      "grants": "reviewed_schema_owner_only"
+    },
+    "api_gateway": {
+      "connect": false,
+      "grants": "none"
+    },
+    "public_web": {
+      "connect": false,
+      "grants": "none"
+    },
+    "control_panel": {
+      "connect": false,
+      "grants": "none"
+    },
+    "support_analyst": {
+      "connect": false,
+      "grants": "masked_authorized_api_projection"
+    }
+  },
+  "tenant_transaction": {
+    "connection": "one_checked_out_connection",
+    "parameter": "app.tenant_id",
+    "bind": "transaction_local",
+    "begin": "BEGIN",
+    "success": [
+      "bind_verified_tenant",
+      "run_owner_queries",
+      "COMMIT",
+      "release"
+    ],
+    "failure": [
+      "ROLLBACK",
+      "release"
+    ],
+    "uncertain_cleanup": "discard_connection",
+    "unbound": "deny",
+    "invalid_tenant": "reject_before_binding"
+  },
+  "tenant_policy": {
+    "enable_rls": true,
+    "force_rls": true,
+    "using": "tenant_key_equals_bound_tenant",
+    "with_check": "tenant_key_equals_bound_tenant",
+    "absent_or_empty": "deny",
+    "tenant_id_not_null": true,
+    "owner_reference": "tenant_qualified_foreign_key",
+    "cross_owner_reference": "owner_contract_only",
+    "schema_create_grant": false,
+    "truncate_grant": false
+  },
+  "owner_foreign_keys": [
+    {
+      "table": "org_units",
+      "columns": [
+        "tenant_id",
+        "parent_id"
+      ],
+      "references": "org_units",
+      "reference_columns": [
+        "tenant_id",
+        "id"
+      ]
+    },
+    {
+      "table": "class_groups",
+      "columns": [
+        "tenant_id",
+        "school_id",
+        "year_id"
+      ],
+      "references": "academic_years",
+      "reference_columns": [
+        "tenant_id",
+        "school_id",
+        "id"
+      ]
+    },
+    {
+      "table": "page_revisions",
+      "columns": [
+        "tenant_id",
+        "site_id"
+      ],
+      "references": "sites",
+      "reference_columns": [
+        "tenant_id",
+        "id"
+      ]
+    },
+    {
+      "table": "attendance_revisions",
+      "columns": [
+        "tenant_id",
+        "record_id"
+      ],
+      "references": "attendance_records",
+      "reference_columns": [
+        "tenant_id",
+        "id"
+      ]
+    },
+    {
+      "table": "message_attempts",
+      "columns": [
+        "tenant_id",
+        "job_id"
+      ],
+      "references": "message_jobs",
+      "reference_columns": [
+        "tenant_id",
+        "id"
+      ]
+    }
+  ],
+  "indexes": [
+    {
+      "table": "entitlements",
+      "columns": [
+        "tenant_id",
+        "feature",
+        "valid_to"
+      ],
+      "unique": false
+    },
+    {
+      "table": "class_groups",
+      "columns": [
+        "tenant_id",
+        "school_id",
+        "year_id"
+      ],
+      "unique": false
+    },
+    {
+      "table": "enrollments",
+      "columns": [
+        "tenant_id",
+        "school_id",
+        "year_id",
+        "status"
+      ],
+      "unique": false
+    },
+    {
+      "table": "page_revisions",
+      "columns": [
+        "tenant_id",
+        "site_id",
+        "published_at"
+      ],
+      "unique": false
+    },
+    {
+      "table": "attendance_revisions",
+      "columns": [
+        "tenant_id",
+        "record_id"
+      ],
+      "unique": false
+    },
+    {
+      "table": "message_attempts",
+      "columns": [
+        "tenant_id",
+        "job_id"
+      ],
+      "unique": false
+    },
+    {
+      "table": "payment_attempts",
+      "columns": [
+        "tenant_id",
+        "idempotency_key"
+      ],
+      "unique": true
+    },
+    {
+      "table": "provider_events",
+      "columns": [
+        "provider",
+        "provider_event_id"
+      ],
+      "unique": true
+    },
+    {
+      "table": "device_events",
+      "columns": [
+        "tenant_id",
+        "device_id",
+        "external_event_id"
+      ],
+      "unique": true
+    },
+    {
+      "table": "attendance_records",
+      "columns": [
+        "tenant_id",
+        "enrollment_id",
+        "class_session_id"
+      ],
+      "unique": true
+    },
+    {
+      "table": "message_jobs",
+      "columns": [
+        "tenant_id",
+        "logical_key"
+      ],
+      "unique": true
+    },
+    {
+      "table": "inbox_dedup",
+      "columns": [
+        "tenant_id",
+        "consumer",
+        "event_id"
+      ],
+      "unique": true
+    },
+    {
+      "table": "inbox_dedup",
+      "columns": [
+        "consumer",
+        "event_id"
+      ],
+      "unique": true
+    },
+    {
+      "table": "domains",
+      "columns": [
+        "host_normalized"
+      ],
+      "unique": true,
+      "predicate": "verified"
+    }
+  ],
+  "api_operations": [
+    {
+      "operation_id": "listTenants",
+      "context": "tenancy_organization",
+      "tenant_source": "verified_memberships"
+    },
+    {
+      "operation_id": "createTenant",
+      "context": "tenancy_organization",
+      "tenant_source": "authorized_provisioning"
+    },
+    {
+      "operation_id": "refreshSession",
+      "context": "identity_access",
+      "tenant_source": "owner_session"
+    },
+    {
+      "operation_id": "listRoles",
+      "context": "identity_access",
+      "tenant_source": "verified_membership"
+    },
+    {
+      "operation_id": "listPlans",
+      "context": "commercial_billing",
+      "tenant_source": "shared_catalog"
+    },
+    {
+      "operation_id": "createPaymentAttempt",
+      "context": "commercial_billing",
+      "tenant_source": "verified_membership"
+    },
+    {
+      "operation_id": "receivePaymentWebhook",
+      "context": "commercial_billing",
+      "tenant_source": "verified_provider_and_owned_invoice"
+    },
+    {
+      "operation_id": "listSites",
+      "context": "sites_content",
+      "tenant_source": "verified_membership"
+    },
+    {
+      "operation_id": "listEnrollments",
+      "context": "school_enrollment",
+      "tenant_source": "verified_membership"
+    },
+    {
+      "operation_id": "createEnrollment",
+      "context": "school_enrollment",
+      "tenant_source": "verified_membership"
+    },
+    {
+      "operation_id": "submitAttendanceBatch",
+      "context": "attendance",
+      "tenant_source": "verified_membership"
+    },
+    {
+      "operation_id": "ingestDeviceEvent",
+      "context": "attendance",
+      "tenant_source": "verified_device_registration"
+    }
+  ],
+  "events": [
+    {
+      "type": "identity.session_revoked.v1",
+      "producer": "identity_access",
+      "consumers": [
+        "platform_audit_jobs"
+      ],
+      "dedupe_key": "session_id+revision"
+    },
+    {
+      "type": "tenancy.org_unit_changed.v1",
+      "producer": "tenancy_organization",
+      "consumers": [
+        "identity_access",
+        "school_enrollment"
+      ],
+      "dedupe_key": "org_unit_id+version"
+    },
+    {
+      "type": "people.profile_changed.v1",
+      "producer": "people_fields",
+      "consumers": [
+        "school_enrollment"
+      ],
+      "dedupe_key": "person_id+version"
+    },
+    {
+      "type": "fields.definition_published.v1",
+      "producer": "people_fields",
+      "consumers": [
+        "sites_content",
+        "school_enrollment"
+      ],
+      "dedupe_key": "definition_id+schema_version"
+    },
+    {
+      "type": "billing.subscription_activated.v1",
+      "producer": "commercial_billing",
+      "consumers": [
+        "tenancy_organization",
+        "identity_access"
+      ],
+      "dedupe_key": "subscription_id+activation_revision"
+    },
+    {
+      "type": "sites.page_published.v1",
+      "producer": "sites_content",
+      "consumers": [
+        "platform_audit_jobs"
+      ],
+      "dedupe_key": "page_id+revision"
+    },
+    {
+      "type": "assets.asset_ready.v1",
+      "producer": "assets",
+      "consumers": [
+        "sites_content",
+        "school_enrollment"
+      ],
+      "dedupe_key": "asset_id+scan_revision"
+    },
+    {
+      "type": "school.enrollment_changed.v1",
+      "producer": "school_enrollment",
+      "consumers": [
+        "attendance",
+        "notifications_integrations"
+      ],
+      "dedupe_key": "enrollment_id+version"
+    },
+    {
+      "type": "attendance.confirmed.v1",
+      "producer": "attendance",
+      "consumers": [
+        "notifications_integrations",
+        "platform_audit_jobs"
+      ],
+      "dedupe_key": "attendance_record_id+revision"
+    },
+    {
+      "type": "notifications.delivery_updated.v1",
+      "producer": "notifications_integrations",
+      "consumers": [
+        "platform_audit_jobs"
+      ],
+      "dedupe_key": "message_attempt_id+status_revision"
+    }
+  ],
+  "event_storage": {
+    "new_types": [],
+    "tenant_binding": "trusted_producer_and_validated_owner_reference",
+    "publish": "transactional_outbox",
+    "consume": "dedupe_in_same_transaction_as_durable_effect",
+    "dedupe_columns": [
+      "tenant_id",
+      "consumer",
+      "event_id"
+    ]
+  },
+  "next_tasks": {
+    "implementation": "S02-W03-T02",
+    "database_acceptance": "S02-W03-T03"
+  }
+}

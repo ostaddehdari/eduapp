@@ -31,6 +31,8 @@ jobs:
       - run: corepack pnpm ci:policy
       - name: Validate Gateway v1 contract
         run: node scripts/validate-gateway-v1-contract.mjs
+      - name: Validate PostgreSQL tenant contract
+        run: node scripts/validate-postgres-tenant-contract.mjs
       - name: Verify executable Gateway and API compatibility
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
