@@ -1,0 +1,12 @@
+{
+  "name": "@eduapp/data",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./tenant-transactions": "./src/tenant-transactions.mjs"
+  },
+  "dependencies": {
+    "pg": "8.16.3"
+  }
+}

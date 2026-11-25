@@ -86,6 +86,14 @@ test('the dependency validator rejects a database import inside a Vue component'
   assert.throws(() => validateBoundaries(dir), /example\.vue imports pg/);
 });
 
+test('the panel cannot depend on the database workspace package', (t) => {
+  const dir = fixture(t);
+  const manifest = JSON.parse(readFileSync(join(dir, panel, 'package.json'), 'utf8'));
+  manifest.dependencies['@eduapp/data'] = 'workspace:*';
+  write(dir, panel + '/package.json', JSON.stringify(manifest));
+  assert.throws(() => validateBoundaries(dir), /package\.json imports @eduapp\/data/);
+});
+
 test('the repository validator rejects missing explicit ownership', (t) => {
   const dir = fixture(t);
   const path = '.github/CODEOWNERS';

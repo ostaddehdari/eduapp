@@ -12,7 +12,33 @@ jobs:
   repository-policy:
     name: ci / repository-policy
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17.12-bookworm
+        env:
+          POSTGRES_DB: eduapp_w03_test
+          POSTGRES_USER: eduapp_ci
+          POSTGRES_PASSWORD: eduapp_ci_only
+        ports:
+          - 127.0.0.1:55432:5432
+        options: >-
+          --health-cmd "pg_isready -U eduapp_ci -d eduapp_w03_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+      rabbitmq:
+        image: rabbitmq:4.2.9
+        env:
+          RABBITMQ_DEFAULT_USER: eduapp_ci
+          RABBITMQ_DEFAULT_PASS: eduapp_ci_only
+        ports:
+          - 127.0.0.1:55672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 18
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -44,6 +70,17 @@ jobs:
           corepack pnpm --filter @eduapp/contracts typecheck
           corepack pnpm --filter @eduapp/contracts test
           corepack pnpm --filter @eduapp/contracts build
+      - name: Test PostgreSQL tenant isolation
+        env:
+          EDUAPP_PG_ADMIN_URL: postgres://eduapp_ci:eduapp_ci_only@127.0.0.1:55432/eduapp_w03_test
+        run: node --test tests/S02-W03/*.test.mjs
+      - name: Test outbox delivery and broker recovery
+        env:
+          EDUAPP_TEST_AMQP_URL: amqp://eduapp_ci:eduapp_ci_only@127.0.0.1:55672
+          EDUAPP_W04_PG_ADMIN_URL: postgres://eduapp_ci:eduapp_ci_only@127.0.0.1:55432/eduapp_w04_test
+        run: node --test tests/S02-W04/*.test.mjs
+      - name: Test development and staging observability
+        run: node --test tests/S02-W05/*.test.mjs
       - run: node scripts/validate-stage-gate-s01.mjs
 
   runtime:
