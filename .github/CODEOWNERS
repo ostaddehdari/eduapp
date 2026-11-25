@@ -6,5 +6,6 @@
 /apps/control-panel/ @ostaddehdari
 /packages/contracts/ @ostaddehdari
 /packages/data/ @ostaddehdari
+/packages/ui-tokens/ @ostaddehdari
 /docs/contracts/ @ostaddehdari
 /infra/ci/ @ostaddehdari
