@@ -1,0 +1,29 @@
+name: monorepo-lock-bootstrap
+on:
+  push:
+    branches: [projectmaker/S02-W01-T02]
+    paths: [.github/workflows/monorepo-bootstrap.yml]
+permissions:
+  contents: read
+jobs:
+  lock:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - name: Pin Corepack
+        run: npm install --global --ignore-scripts corepack@0.36.0
+      - name: Resolve workspace lockfile
+        run: corepack pnpm install --lockfile-only --ignore-scripts
+      - name: Record generated lockfile for branch setup
+        run: |
+          sha256sum pnpm-lock.yaml
+          node --input-type=module -e 'import { readFileSync } from "node:fs"; import { gzipSync } from "node:zlib"; const data = gzipSync(readFileSync("pnpm-lock.yaml")).toString("base64"); for (const chunk of data.match(/.{1,512}/g)) console.log("EDUAPP_LOCK " + chunk);'

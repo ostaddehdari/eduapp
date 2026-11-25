@@ -1,0 +1,27 @@
+{
+  "name": "eduapp",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@12.23.0",
+  "engines": {
+    "node": ">=22.22.0 <23",
+    "pnpm": "12.23.0"
+  },
+  "scripts": {
+    "lint": "corepack pnpm -r lint",
+    "typecheck": "corepack pnpm -r typecheck",
+    "test": "corepack pnpm -r test",
+    "build": "corepack pnpm -r build",
+    "ci:policy": "node scripts/validate-monorepo-ci-contract.mjs && node infra/ci/validate.mjs repository"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "22.19.15",
+    "eslint": "10.15.0",
+    "eslint-plugin-vue": "10.12.1",
+    "tsx": "4.23.15",
+    "typescript": "6.0.2",
+    "typescript-eslint": "8.74.0",
+    "vue-eslint-parser": "10.4.2"
+  }
+}
