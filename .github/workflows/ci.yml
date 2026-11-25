@@ -18,6 +18,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 2
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -30,6 +31,16 @@ jobs:
       - run: corepack pnpm ci:policy
       - name: Validate Gateway v1 contract
         run: node scripts/validate-gateway-v1-contract.mjs
+      - name: Verify executable Gateway and API compatibility
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          node scripts/gateway-contract.mjs check "$PR_BASE_SHA"
+          node --test apps/api-gateway/test/*.test.mjs
+          corepack pnpm --filter @eduapp/contracts lint
+          corepack pnpm --filter @eduapp/contracts typecheck
+          corepack pnpm --filter @eduapp/contracts test
+          corepack pnpm --filter @eduapp/contracts build
       - run: node scripts/validate-stage-gate-s01.mjs
 
   runtime:
