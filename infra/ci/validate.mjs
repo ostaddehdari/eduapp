@@ -9,7 +9,7 @@ const read = (root, path) => readFileSync(resolve(root, path), 'utf8');
 const json = (root, path) => JSON.parse(read(root, path));
 const contractPath = 'docs/contracts/S02-W01.json';
 const frontendPaths = new Set(['apps/public-web', 'apps/control-panel']);
-const databases = /^(?:pg|postgres|mysql2|better-sqlite3|typeorm|drizzle-orm|knex|@prisma\/client)(?:\/|$)/;
+const databases = /^(?:pg|postgres|mysql2|better-sqlite3|typeorm|drizzle-orm|knex|@prisma\/client|@eduapp\/data)(?:\/|$)/;
 
 export function validateRepository(root = repositoryRoot) {
   const contract = json(root, contractPath);
@@ -53,8 +53,9 @@ function validateSpecifier({ root, unit, manifest, sharedNames }, specifier, fil
   const label = relative(root, file) + ' imports ' + specifier;
   if (frontendPaths.has(unit.path)) assert.doesNotMatch(specifier, databases, label);
   if (specifier.startsWith('@eduapp/')) {
-    assert.ok(sharedNames.has(specifier), label);
-    const declared = manifest.dependencies?.[specifier] ?? manifest.devDependencies?.[specifier];
+    const packageName = specifier.split('/').slice(0, 2).join('/');
+    assert.ok(sharedNames.has(packageName), label);
+    const declared = manifest.dependencies?.[packageName] ?? manifest.devDependencies?.[packageName];
     assert.match(declared ?? '', /^workspace:/, label);
   }
   if (specifier.startsWith('.')) {

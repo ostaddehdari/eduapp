@@ -132,12 +132,14 @@ export function createGateway({
   limiter = createMemoryRateLimiter(),
   cursors = createMemoryCursorStore(),
   ready = () => true,
+  monitor,
   systemBudget = { max: 60, windowSeconds: 60 },
 } = {}) {
   const system = [
     { id: 'getLiveness', handle: () => ({ data: { status: 'ok' } }) },
-    { id: 'getReadiness', budget: systemBudget, handle: async () => {
-      if (!await ready()) unavailable();
+    { id: 'getReadiness', budget: systemBudget, handle: async (_input, span) => {
+      const isReady = span ? await span.checkReadiness(ready) : await ready();
+      if (!isReady) unavailable();
       return { data: { status: 'ok' } };
     } },
     { id: 'getVersion', budget: systemBudget, handle: () => ({ data: { version: runtimeVersion } }) },
@@ -149,6 +151,11 @@ export function createGateway({
   return async function gateway(req, res) {
     const responseHeaders = { 'X-Request-Id': randomUUID(), 'Cache-Control': 'no-store' };
     const requestId = responseHeaders['X-Request-Id'];
+    const span = monitor?.startRequest(requestId, req.method);
+    if (span) {
+      res.once('finish', () => span.finish(res.statusCode));
+      res.once('close', () => span.finish(0));
+    }
     try {
       if (typeof req.url !== 'string' || !req.url.startsWith('/') || req.url.startsWith('//')) invalid();
       const question = req.url.indexOf('?');
@@ -166,6 +173,7 @@ export function createGateway({
       }
       if (!selected) fail('NOT_FOUND');
       const route = selected;
+      span?.setOperation(route.id);
       let identity;
       if (!route.publicRoute) {
         identity = await authenticate?.(req.headers.authorization);
@@ -223,6 +231,8 @@ export function createGateway({
         const namespace = [identity.scope, identity.actor, route.id, key];
         const fingerprint = createHash('sha256').update(canonical([route.method, route.path, params, query, body])).digest('hex');
         result = await route.executeIdempotent({ namespace, fingerprint }, () => route.handle(input));
+      } else if (span && route.id === 'getReadiness') {
+        result = await route.handle(input, span);
       } else {
         result = await route.handle(input);
       }
