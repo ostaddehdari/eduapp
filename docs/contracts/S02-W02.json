@@ -1,0 +1,331 @@
+{
+  "schema_version": "1.0",
+  "contract_id": "S02-W02",
+  "version": "1.0.0",
+  "status": "accepted",
+  "requirement_ids": [
+    "OPS-001"
+  ],
+  "scope": "gateway_contract_only",
+  "owner": "gateway_platform",
+  "next_task": "S02-W02-T02",
+  "sources": {
+    "catalog": "preview/api/openapi.json",
+    "components": "packages/contracts/openapi/gateway-v1.json",
+    "ownership": "docs/contracts/S01-W03.json",
+    "commercial": "docs/contracts/S01-W02.json"
+  },
+  "routing": {
+    "public_base": "https://srun.ir/eduapp/api/v1",
+    "internal_prefix": "/v1",
+    "route_owner": "source_of_truth_api_tag_ownership",
+    "existing_operation_count": 64,
+    "domain_authorization": "domain_owner",
+    "trusted_tenant_context": "verified_session_membership_and_scope",
+    "accept_client_context_headers": false,
+    "provider_callback_operation": "receivePaymentWebhook",
+    "provider_callback_owner": "commercial_billing",
+    "provider_callback_verification": "verified_signature_or_provider_inquiry"
+  },
+  "request_id": {
+    "header": "X-Request-Id",
+    "generated_at": "gateway",
+    "format": "uuid",
+    "response": "same_as_body_meta_requestId",
+    "accept_client_value": false
+  },
+  "response": {
+    "success": "SuccessEnvelope",
+    "paged": "PageEnvelope",
+    "failure": "ErrorEnvelope",
+    "transport_version": "v1",
+    "no_content_responses_have_body": false
+  },
+  "errors": [
+    {
+      "status": 400,
+      "code": "INVALID_REQUEST"
+    },
+    {
+      "status": 401,
+      "code": "AUTHENTICATION_REQUIRED"
+    },
+    {
+      "status": 403,
+      "code": "FORBIDDEN"
+    },
+    {
+      "status": 404,
+      "code": "NOT_FOUND"
+    },
+    {
+      "status": 409,
+      "code": "CONFLICT"
+    },
+    {
+      "status": 409,
+      "code": "IDEMPOTENCY_CONFLICT"
+    },
+    {
+      "status": 409,
+      "code": "IDEMPOTENCY_IN_PROGRESS"
+    },
+    {
+      "status": 412,
+      "code": "PRECONDITION_FAILED"
+    },
+    {
+      "status": 422,
+      "code": "VALIDATION_FAILED"
+    },
+    {
+      "status": 428,
+      "code": "PRECONDITION_REQUIRED"
+    },
+    {
+      "status": 429,
+      "code": "RATE_LIMITED"
+    },
+    {
+      "status": 503,
+      "code": "SERVICE_UNAVAILABLE"
+    }
+  ],
+  "pagination": {
+    "mode": "opaque_cursor",
+    "limit_default": 25,
+    "limit_max": 100,
+    "cursor_ttl_seconds": 900,
+    "bound_to": [
+      "operation",
+      "verified_scope",
+      "normalized_query"
+    ],
+    "ordering": "owner_allowlisted_sort_with_unique_tie_breaker",
+    "invalid_cursor": "400_INVALID_REQUEST",
+    "cross_scope_cursor": "400_INVALID_REQUEST",
+    "operation_ids": [
+      "listMySessions",
+      "listRoles",
+      "listTenants",
+      "listOrgUnits",
+      "listUsers",
+      "listFieldDefinitions",
+      "listPlans",
+      "listSites",
+      "listPages",
+      "listDomains",
+      "listAcademicYears",
+      "listClasses",
+      "listStudents",
+      "listEnrollments",
+      "listAttendanceRecords",
+      "listNotificationRules",
+      "listTemplates",
+      "listMessageJobs",
+      "listProviders"
+    ]
+  },
+  "concurrency": {
+    "request_header": "If-Match",
+    "response_header": "ETag",
+    "required_operations": [
+      "updateRole"
+    ],
+    "missing": 428,
+    "stale": 412,
+    "domain_owner_atomically_checks_version": true
+  },
+  "idempotency": {
+    "header": "Idempotency-Key",
+    "key_min_length": 8,
+    "key_max_length": 128,
+    "client_operations": [
+      "createTenant",
+      "createCheckout",
+      "createPaymentAttempt",
+      "createEnrollment",
+      "submitAttendanceBatch",
+      "ingestDeviceEvent"
+    ],
+    "namespace": [
+      "verified_scope",
+      "authenticated_actor",
+      "operation",
+      "key"
+    ],
+    "fingerprint": [
+      "method",
+      "normalized_target",
+      "canonical_content"
+    ],
+    "same_fingerprint": "return_committed_status_and_body_with_current_request_id_after_authorization",
+    "different_fingerprint": "409_IDEMPOTENCY_CONFLICT",
+    "pending": "409_IDEMPOTENCY_IN_PROGRESS",
+    "durable_outcome_owner": "domain_owner",
+    "provider_replay_identity": [
+      "provider",
+      "verified_provider_event_id"
+    ],
+    "unavailable_dedup_store": "503_SERVICE_UNAVAILABLE"
+  },
+  "rate_limit": {
+    "default_limit_policy": "configure_per_route_before_exposure",
+    "authenticated_scope": [
+      "verified_scope",
+      "authenticated_actor",
+      "route_class"
+    ],
+    "anonymous_scope": [
+      "trusted_proxy_network_identity",
+      "route_class"
+    ],
+    "over_limit": 429,
+    "retry_after": "delta_seconds",
+    "unavailable_required_limiter": 503,
+    "liveness_requires_limiter": false
+  },
+  "data_ownership": {
+    "new_tables": [],
+    "gateway_table_ownership": [],
+    "transient_state": "gateway_platform_scoped_rate_counters",
+    "durable": [
+      {
+        "owner": "iam",
+        "tables": [
+          "sessions"
+        ]
+      },
+      {
+        "owner": "access",
+        "tables": [
+          "memberships",
+          "role_bindings"
+        ]
+      },
+      {
+        "owner": "tenancy",
+        "tables": [
+          "tenants"
+        ]
+      },
+      {
+        "owner": "billing",
+        "tables": [
+          "provider_events",
+          "ledger_entries"
+        ]
+      },
+      {
+        "owner": "attendance",
+        "tables": [
+          "device_events"
+        ]
+      },
+      {
+        "owner": "platform",
+        "tables": [
+          "audit_events",
+          "outbox_events",
+          "inbox_dedup"
+        ]
+      }
+    ]
+  },
+  "events": {
+    "new_events": [],
+    "gateway_domain_event_writes": false,
+    "references": [
+      "identity.session_revoked.v1",
+      "tenancy.org_unit_changed.v1",
+      "billing.subscription_activated.v1",
+      "attendance.confirmed.v1"
+    ]
+  },
+  "permissions": [
+    {
+      "actor": "anonymous_client",
+      "allow": [
+        "documented_public_operations"
+      ],
+      "deny": [
+        "tenant_data",
+        "internal_routes"
+      ]
+    },
+    {
+      "actor": "authenticated_client",
+      "allow": [
+        "request_owner_authorized_operations"
+      ],
+      "deny": [
+        "assert_tenant_context",
+        "select_arbitrary_event_stream"
+      ]
+    },
+    {
+      "actor": "api_gateway",
+      "allow": [
+        "authenticate",
+        "rate_limit",
+        "route"
+      ],
+      "deny": [
+        "direct_table_write",
+        "final_domain_authorization",
+        "publish_domain_events"
+      ]
+    },
+    {
+      "actor": "domain_owner",
+      "allow": [
+        "authorize_operation",
+        "write_owned_data",
+        "publish_owned_events"
+      ],
+      "deny": [
+        "cross_owner_table_write"
+      ]
+    },
+    {
+      "actor": "verified_callback_provider",
+      "allow": [
+        "submit_matching_verified_callback"
+      ],
+      "deny": [
+        "access_tenant_collection",
+        "write_ledger_directly"
+      ]
+    },
+    {
+      "actor": "ci_sdk_generator",
+      "allow": [
+        "read_versioned_openapi",
+        "generate_and_compare_sdk"
+      ],
+      "deny": [
+        "deploy_production",
+        "read_production_secrets"
+      ]
+    }
+  ],
+  "compatibility": {
+    "baseline": "last_published_v1_contract",
+    "sdk": "typescript",
+    "public_base": "https://srun.ir/eduapp/api/v1",
+    "pin_generator": true,
+    "deterministic_output": true,
+    "compare_generated_artifact": true,
+    "block_breaking": [
+      "remove_operation",
+      "remove_success_response",
+      "change_operation_id",
+      "narrow_request_inputs",
+      "require_new_request_input",
+      "remove_response_field",
+      "widen_response_types_or_enum"
+    ],
+    "internal_operations_in_public_sdk": false,
+    "publication": "implementation_and_compatibility_gate"
+  }
+}

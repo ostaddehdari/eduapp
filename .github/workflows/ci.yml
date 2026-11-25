@@ -28,6 +28,8 @@ jobs:
       - name: Install locked dependencies
         run: corepack pnpm install --frozen-lockfile --ignore-scripts
       - run: corepack pnpm ci:policy
+      - name: Validate Gateway v1 contract
+        run: node scripts/validate-gateway-v1-contract.mjs
       - run: node scripts/validate-stage-gate-s01.mjs
 
   runtime:

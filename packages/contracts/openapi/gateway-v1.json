@@ -1,0 +1,417 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "EduApp Gateway v1 common OpenAPI components",
+    "version": "1.0.0",
+    "description": "Reusable components for the versioned catalog. Route publication is separate."
+  },
+  "servers": [
+    {
+      "url": "https://srun.ir/eduapp/api/v1"
+    }
+  ],
+  "paths": {},
+  "components": {
+    "schemas": {
+      "RequestId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "Cursor": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2048,
+        "pattern": "^[A-Za-z0-9._~-]+$"
+      },
+      "RequestMeta": {
+        "type": "object",
+        "required": [
+          "requestId"
+        ],
+        "properties": {
+          "requestId": {
+            "$ref": "#/components/schemas/RequestId"
+          }
+        }
+      },
+      "SuccessMeta": {
+        "type": "object",
+        "required": [
+          "requestId",
+          "version"
+        ],
+        "properties": {
+          "requestId": {
+            "$ref": "#/components/schemas/RequestId"
+          },
+          "version": {
+            "type": "string",
+            "const": "v1"
+          }
+        }
+      },
+      "PageMeta": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessMeta"
+          },
+          {
+            "type": "object",
+            "required": [
+              "nextCursor"
+            ],
+            "properties": {
+              "nextCursor": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/Cursor"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "SuccessEnvelope": {
+        "type": "object",
+        "required": [
+          "data",
+          "meta"
+        ],
+        "properties": {
+          "data": {},
+          "meta": {
+            "$ref": "#/components/schemas/SuccessMeta"
+          }
+        }
+      },
+      "PageEnvelope": {
+        "type": "object",
+        "required": [
+          "data",
+          "meta"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {}
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "required": [
+          "error",
+          "meta"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "details"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9_]*$"
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "details": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "code"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "field": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RequestMeta"
+          }
+        }
+      }
+    },
+    "parameters": {
+      "Cursor": {
+        "name": "cursor",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "$ref": "#/components/schemas/Cursor"
+        }
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 25,
+          "maximum": 100
+        }
+      },
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 128
+        }
+      },
+      "IfMatch": {
+        "name": "If-Match",
+        "in": "header",
+        "required": true,
+        "description": "The strong ETag issued for this resource version.",
+        "schema": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 256
+        }
+      }
+    },
+    "headers": {
+      "RequestId": {
+        "description": "Gateway-generated identifier, equal to body meta.requestId where a body is present.",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/RequestId"
+        }
+      },
+      "RetryAfter": {
+        "description": "Whole seconds before retrying.",
+        "required": true,
+        "schema": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "Authenticate": {
+        "description": "Authentication challenge for the route.",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "ETag": {
+        "description": "Strong resource revision identifier.",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "responses": {
+      "INVALID_REQUEST": {
+        "description": "400 INVALID_REQUEST",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "AUTHENTICATION_REQUIRED": {
+        "description": "401 AUTHENTICATION_REQUIRED",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "WWW-Authenticate": {
+            "$ref": "#/components/headers/Authenticate"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "FORBIDDEN": {
+        "description": "403 FORBIDDEN",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "NOT_FOUND": {
+        "description": "404 NOT_FOUND",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "IDEMPOTENCY_CONFLICT": {
+        "description": "409 IDEMPOTENCY_CONFLICT",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "PRECONDITION_FAILED": {
+        "description": "412 PRECONDITION_FAILED",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "VALIDATION_FAILED": {
+        "description": "422 VALIDATION_FAILED",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "PRECONDITION_REQUIRED": {
+        "description": "428 PRECONDITION_REQUIRED",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "RATE_LIMITED": {
+        "description": "429 RATE_LIMITED",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "Retry-After": {
+            "$ref": "#/components/headers/RetryAfter"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "SERVICE_UNAVAILABLE": {
+        "description": "503 SERVICE_UNAVAILABLE",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "CONFLICT": {
+        "description": "409 CONFLICT",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "IDEMPOTENCY_IN_PROGRESS": {
+        "description": "409 IDEMPOTENCY_IN_PROGRESS",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      }
+    }
+  }
+}
