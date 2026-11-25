@@ -78,3 +78,5 @@ jobs:
       - name: Install locked dependencies
         run: corepack pnpm install --frozen-lockfile --ignore-scripts
       - run: node infra/ci/validate.mjs boundaries
+      - name: Test Monorepo acceptance cases
+        run: node --import tsx --test tests/S02-W01/monorepo-ci.test.mjs
