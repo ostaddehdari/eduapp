@@ -27,7 +27,7 @@ function validateRepository() {
   assert.equal(protection.required_conversation_resolution, true);
   assert.equal(protection.allow_force_pushes, false);
   assert.equal(protection.allow_deletions, false);
-  assert.match(read('pnpm-lock.yaml'), /^lockfileVersion:/);
+  assert.match(read('pnpm-lock.yaml'), /^lockfileVersion:/m);
   const workflow = read('.github/workflows/ci.yml');
   assert.match(workflow, /pull_request:\n\s+branches: \[main\]/);
   assert.doesNotMatch(workflow, /\b(?:pull_request_target|self-hosted|secrets\.)/);
