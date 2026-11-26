@@ -30,9 +30,10 @@ const errors = new Map([
 ]);
 
 export class GatewayError extends Error {
-  constructor(code) {
+  constructor(code, { retryAfter } = {}) {
     super(code);
     this.code = code;
+    this.retryAfter = retryAfter;
   }
 }
 
@@ -100,6 +101,11 @@ async function readBody(req) {
   return parsed;
 }
 
+function hasRequestPayload(headers) {
+  return headers['transfer-encoding'] !== undefined ||
+    (headers['content-length'] !== undefined && headers['content-length'] !== '0');
+}
+
 function register(config) {
   const entry = routesById.get(config.id);
   if (!entry || typeof config.handle !== 'function') throw new TypeError('Unknown or incomplete Gateway route');
@@ -111,6 +117,9 @@ function register(config) {
     throw new TypeError('Provider callbacks require a separate verified adapter');
   }
   if (!publicRoute && typeof config.authorize !== 'function') throw new TypeError('Owner authorization is required');
+  if (config.forwardAuthorization && (!publicRoute || config.id !== 'refreshSession')) {
+    throw new TypeError('Only the refresh owner may receive the public Authorization credential');
+  }
   if (idempotent && typeof config.executeIdempotent !== 'function') throw new TypeError('Owner idempotency storage is required');
   const budget = config.budget;
   if (config.id !== 'getLiveness' && (!budget ||
@@ -207,8 +216,11 @@ export function createGateway({
       if (route.versioned && ifMatch === undefined) fail('PRECONDITION_REQUIRED');
       if (route.versioned && (typeof ifMatch !== 'string' || !/^"[\x21\x23-\x7e]{1,254}"$/.test(ifMatch))) invalid();
 
-      const body = ['POST', 'PUT', 'PATCH'].includes(route.method) ? await readBody(req) : undefined;
+      const body = ['POST', 'PUT', 'PATCH'].includes(route.method)
+        ? (route.operation.requestBody || hasRequestPayload(req.headers) ? await readBody(req) : undefined)
+        : undefined;
       const input = { identity, params, query, body, ifMatch, requestId };
+      if (route.forwardAuthorization) input.authorization = req.headers.authorization;
       if (route.authorize && await route.authorize(input) !== true) fail('NOT_FOUND');
 
       let binding;
@@ -263,6 +275,9 @@ export function createGateway({
       }
       const code = err instanceof GatewayError && errors.has(err.code) ? err.code : 'SERVICE_UNAVAILABLE';
       if (code === 'AUTHENTICATION_REQUIRED') responseHeaders['WWW-Authenticate'] ??= 'Bearer';
+      if (code === 'RATE_LIMITED' && Number.isSafeInteger(err.retryAfter) && err.retryAfter > 0) {
+        responseHeaders['Retry-After'] ??= String(err.retryAfter);
+      }
       const [status, message] = errors.get(code);
       if (code === 'RATE_LIMITED' && !responseHeaders['Retry-After']) {
         write(res, 503, responseHeaders, { error: { code: 'SERVICE_UNAVAILABLE', message: errors.get('SERVICE_UNAVAILABLE')[1], details: [] }, meta: { requestId } });
