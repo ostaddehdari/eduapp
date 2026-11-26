@@ -25,6 +25,7 @@
     "shared_units": [
       {"id": "contracts", "path": "packages/contracts", "owner": "contracts", "may_import_apps": false},
       {"id": "data", "path": "packages/data", "owner": "backend", "may_import_apps": false},
+      {"id": "ui-tokens", "path": "packages/ui-tokens", "owner": "platform", "may_import_apps": false},
       {"id": "config", "path": "packages/config", "owner": "platform", "may_import_apps": false},
       {"id": "test-utils", "path": "packages/test-utils", "owner": "platform", "may_import_apps": false}
     ],
@@ -49,6 +50,7 @@
       {"pattern": "/apps/control-panel/", "logical_owner": "control_panel", "github_owner": "@ostaddehdari"},
       {"pattern": "/packages/contracts/", "logical_owner": "contracts", "github_owner": "@ostaddehdari"},
       {"pattern": "/packages/data/", "logical_owner": "backend", "github_owner": "@ostaddehdari"},
+      {"pattern": "/packages/ui-tokens/", "logical_owner": "platform", "github_owner": "@ostaddehdari"},
       {"pattern": "/docs/contracts/", "logical_owner": "contracts", "github_owner": "@ostaddehdari"},
       {"pattern": "/infra/ci/", "logical_owner": "ci", "github_owner": "@ostaddehdari"}
     ],

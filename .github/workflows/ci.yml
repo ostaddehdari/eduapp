@@ -81,6 +81,13 @@ jobs:
         run: node --test tests/S02-W04/*.test.mjs
       - name: Test development and staging observability
         run: node --test tests/S02-W05/*.test.mjs
+      - name: Install Chromium for the interface acceptance test
+        run: corepack pnpm exec playwright install --with-deps --only-shell chromium
+      - name: Test the shared interface in both frontends
+        run: |
+          corepack pnpm --filter @eduapp/public-web build
+          corepack pnpm --filter @eduapp/control-panel build
+          node --test tests/S02-W06/*.test.mjs
       - run: node scripts/validate-stage-gate-s01.mjs
 
   runtime:

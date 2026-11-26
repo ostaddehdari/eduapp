@@ -1,0 +1,187 @@
+@import '@fontsource-variable/vazirmatn';
+
+:root {
+  color-scheme: light;
+  --edu-font: 'Vazirmatn Variable', 'Segoe UI', Tahoma, sans-serif;
+  --edu-canvas: #f6f7f2;
+  --edu-paper: #fff;
+  --edu-ink: #182d28;
+  --edu-muted: #425d55;
+  --edu-accent: #174f40;
+  --edu-accent-hover: #0d392e;
+  --edu-tint: #eaf2ea;
+  --edu-line: #cbd9cd;
+  --edu-error: #822f27;
+  --edu-error-surface: #fff3ef;
+  --edu-focus: #165f4b;
+  --edu-radius: 1.125rem;
+  --edu-frame: 76rem;
+  --edu-space: clamp(1.125rem, 4vw, 3rem);
+  --edu-motion: 160ms;
+  font: 1rem/1.7 var(--edu-font);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; color: var(--edu-ink); background: var(--edu-canvas); }
+a { color: var(--edu-accent); text-underline-offset: .25em; }
+a, summary { -webkit-tap-highlight-color: transparent; }
+a:focus-visible, summary:focus-visible, main:focus-visible {
+  outline: .1875rem solid var(--edu-focus);
+  outline-offset: .25rem;
+}
+h1, h2, p, dl, dd { margin: 0; }
+
+.edu-frame {
+  inline-size: min(calc(100% - 2 * var(--edu-space)), var(--edu-frame));
+  margin-inline: auto;
+}
+.edu-skip {
+  position: fixed;
+  z-index: 5;
+  inset-block-start: .75rem;
+  inset-inline-start: var(--edu-space);
+  padding: .625rem 1rem;
+  border-radius: .5rem;
+  background: var(--edu-paper);
+}
+.edu-skip:not(:focus) {
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.edu-header {
+  background: var(--edu-paper);
+  border-block-end: 1px solid var(--edu-line);
+}
+.edu-bar, .edu-nav, .edu-school-links {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .75rem 1.5rem;
+}
+.edu-bar {
+  justify-content: space-between;
+  min-block-size: 4.75rem;
+  padding-block: .625rem;
+}
+.edu-brand {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 2.75rem;
+  font-size: 1.25rem;
+  font-weight: 800;
+  text-decoration: none;
+  color: var(--edu-ink);
+}
+.edu-nav a, .edu-school-links a {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 2.75rem;
+  font-weight: 600;
+}
+.edu-school-links { gap: .375rem .5rem; margin-block-start: .75rem; }
+.edu-school-links a {
+  padding-inline: .8rem;
+  border: 1px solid var(--edu-line);
+  border-radius: .625rem;
+  text-decoration: none;
+}
+.edu-school-links a[aria-current="true"] {
+  background: var(--edu-tint);
+  border-color: var(--edu-accent);
+  font-weight: 750;
+}
+.edu-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--edu-space);
+  padding-block: clamp(2.25rem, 8vw, 7rem);
+}
+.edu-shell--panel { grid-template-columns: minmax(0, .82fr) minmax(0, 1.18fr); }
+.edu-intro { padding-block-start: clamp(.5rem, 2vw, 1.75rem); }
+.edu-context {
+  margin-block-end: .75rem;
+  color: var(--edu-muted);
+  font-weight: 650;
+}
+.edu-heading {
+  max-inline-size: 17ch;
+  font-size: clamp(2.1rem, 5vw + .5rem, 4.6rem);
+  font-weight: 850;
+  line-height: 1.25;
+}
+.edu-shell--panel .edu-heading { font-size: clamp(2rem, 3.3vw + .5rem, 3.65rem); }
+.edu-description {
+  max-inline-size: 40ch;
+  margin-block-start: 1.1rem;
+  color: var(--edu-muted);
+  font-size: clamp(1rem, 1vw + .72rem, 1.15rem);
+}
+.edu-primary {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 2.75rem;
+  padding: .55rem 1.1rem;
+  margin-block-start: 1.5rem;
+  border-radius: .65rem;
+  background: var(--edu-accent);
+  color: var(--edu-paper);
+  text-decoration: none;
+  font-weight: 700;
+}
+.edu-primary:hover { background: var(--edu-accent-hover); }
+.edu-card {
+  min-inline-size: 0;
+  border: 1px solid var(--edu-line);
+  border-radius: var(--edu-radius);
+  background: var(--edu-paper);
+  box-shadow: 0 1rem 2.5rem rgb(24 45 40 / .06);
+  overflow: clip;
+}
+.edu-card-head {
+  padding: clamp(1.1rem, 3vw, 2rem);
+  border-block-end: 1px solid var(--edu-line);
+  background: var(--edu-tint);
+}
+.edu-card-head h2 { font-size: 1.35rem; line-height: 1.45; }
+.edu-card-body { padding: clamp(1.1rem, 3vw, 2rem); }
+.edu-record {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-block-end: 1rem;
+}
+.edu-record dt { color: var(--edu-muted); font-size: .9rem; }
+.edu-record dd { margin-block-start: .25rem; font-weight: 700; }
+.edu-error {
+  padding: .75rem;
+  border-radius: .5rem;
+  background: var(--edu-error-surface);
+  color: var(--edu-error);
+}
+.edu-details { border-block-start: 1px solid var(--edu-line); }
+.edu-details summary {
+  min-block-size: 2.75rem;
+  padding: .45rem .4rem;
+  border-radius: .375rem;
+  color: var(--edu-accent);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color var(--edu-motion);
+}
+.edu-details summary:hover { background: var(--edu-tint); }
+.edu-details p { padding: .5rem .4rem .35rem; color: var(--edu-muted); }
+
+@media (max-width: 49rem) {
+  .edu-shell, .edu-shell--panel { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 27rem) {
+  .edu-record { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .edu-details summary { transition: none; }
+}
