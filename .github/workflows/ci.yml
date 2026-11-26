@@ -89,6 +89,8 @@ jobs:
           corepack pnpm --filter @eduapp/control-panel build
           node --test tests/S02-W06/*.test.mjs
       - run: node scripts/validate-stage-gate-s01.mjs
+      - name: Validate the S02 evidence gate
+        run: node scripts/validate-stage-gate-s02.mjs
 
   runtime:
     name: ci / ${{ matrix.runtime }}

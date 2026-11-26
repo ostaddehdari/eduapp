@@ -1,0 +1,81 @@
+{
+  "schema_version": "1.0",
+  "version": "1.0.0",
+  "gate_id": "S02-W07-T01",
+  "stage_id": "S02",
+  "evaluated_at": "2026-11-26T17:18:54.958Z",
+  "evaluated_source_sha": "5d4f39a2a11bf8ba2190e48b7bce56a8a73c13d2",
+  "evaluated_workflow": "https://github.com/ostaddehdari/eduapp/actions/runs/45691814808",
+  "requirement_ids": [
+    "OPS-001"
+  ],
+  "decision": "GO_TO_S03_IDENTITY_DEVELOPMENT",
+  "production_authorization": false,
+  "providers_activation_authorization": false,
+  "works": [
+    {
+      "id": "S02-W01",
+      "terminal_task": "S02-W01-T03",
+      "status": "accepted",
+      "source_commit": "acce8e50f7ebe86547af3f7c9f701078724b6f52",
+      "ci": "https://github.com/ostaddehdari/eduapp/actions/runs/45566299060",
+      "log": "logs/S02-W01-T03/attempt-001.md",
+      "suite": "tests/S02-W01/monorepo-ci.test.mjs"
+    },
+    {
+      "id": "S02-W02",
+      "terminal_task": "S02-W02-T03",
+      "status": "accepted",
+      "source_commit": "a51000ec5314929507d6d8287938cfdf200f9845",
+      "ci": "https://github.com/ostaddehdari/eduapp/actions/runs/45653172405",
+      "log": "logs/S02-W02-T03/attempt-001.md",
+      "suite": "tests/S02-W02/gateway-acceptance.test.mjs"
+    },
+    {
+      "id": "S02-W03",
+      "terminal_task": "S02-W03-T03",
+      "status": "accepted",
+      "source_commit": "a46bf58e342ebd4cd0ba6ec9b6275486c9106653",
+      "ci": "https://github.com/ostaddehdari/eduapp/actions/runs/45667926147",
+      "log": "logs/S02-W03-T03/attempt-001.md",
+      "suite": "tests/S02-W03/postgres-isolation.test.mjs"
+    },
+    {
+      "id": "S02-W04",
+      "terminal_task": "S02-W04-T03",
+      "status": "accepted",
+      "source_commit": "a46bf58e342ebd4cd0ba6ec9b6275486c9106653",
+      "ci": "https://github.com/ostaddehdari/eduapp/actions/runs/45667926147",
+      "log": "logs/S02-W04-T03/attempt-001.md",
+      "suite": "tests/S02-W04/postgres-rabbitmq.test.mjs"
+    },
+    {
+      "id": "S02-W05",
+      "terminal_task": "S02-W05-T03",
+      "status": "accepted",
+      "source_commit": "a46bf58e342ebd4cd0ba6ec9b6275486c9106653",
+      "ci": "https://github.com/ostaddehdari/eduapp/actions/runs/45667926147",
+      "log": "logs/S02-W05-T03/attempt-001.md",
+      "suite": "tests/S02-W05/observability.test.mjs"
+    },
+    {
+      "id": "S02-W06",
+      "terminal_task": "S02-W06-T03",
+      "status": "accepted",
+      "source_commit": "5d4f39a2a11bf8ba2190e48b7bce56a8a73c13d2",
+      "ci": "https://github.com/ostaddehdari/eduapp/actions/runs/45691814808",
+      "log": "logs/S02-W06-T03/attempt-001.md",
+      "suite": "tests/S02-W06/browser.test.mjs"
+    }
+  ],
+  "tenant_boundary": {
+    "result": "no_cross_tenant_exposure_observed_in_tested_scenarios",
+    "coverage": [
+      "gateway",
+      "postgresql",
+      "event_delivery",
+      "observability",
+      "ui_preview"
+    ]
+  }
+}
