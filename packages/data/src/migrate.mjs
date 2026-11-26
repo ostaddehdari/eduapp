@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
-const migrationVersion = '0001-tenant-isolation';
+const foundationVersion = '0001-tenant-isolation';
 const sqlFile = (name) => new URL(`../migrations/${name}.sql`, import.meta.url);
 
 async function inMigrationTransaction(client, operation) {
@@ -31,7 +31,7 @@ export async function runSqlBootstrap(client) {
   });
 }
 
-export async function applyTenantIsolation(client) {
+async function applyMigration(client, migrationVersion, prerequisite) {
   const sql = await readFile(sqlFile(migrationVersion), 'utf8');
   const checksum = createHash('sha256').update(sql).digest('hex');
   return inMigrationTransaction(client, async () => {
@@ -52,6 +52,13 @@ export async function applyTenantIsolation(client) {
       if (existing.sha256 !== checksum) throw new Error('Applied migration checksum differs');
       return false;
     }
+    if (prerequisite) {
+      const verified = await client.query(
+        'SELECT 1 FROM eduapp_migrations.applied WHERE version = $1',
+        [prerequisite],
+      );
+      if (verified.rowCount !== 1) throw new Error('Required foundation migration has not been applied');
+    }
     await client.query(sql);
     await client.query(
       'INSERT INTO eduapp_migrations.applied (version, sha256) VALUES ($1, $2)',
@@ -61,11 +68,23 @@ export async function applyTenantIsolation(client) {
   });
 }
 
+export function applyTenantIsolation(client) {
+  return applyMigration(client, foundationVersion);
+}
+
+export function applyIamSessions(client) {
+  return applyMigration(client, '0002-iam-sessions', foundationVersion);
+}
+
+export function applyAccessInvitations(client) {
+  return applyMigration(client, '0003-access-invitations', foundationVersion);
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const mode = process.argv[2];
   const connectionString = process.env.EDUAPP_DATABASE_URL;
-  if (!connectionString || (mode !== 'bootstrap' && mode !== 'apply')) {
-    console.error('Set EDUAPP_DATABASE_URL and choose bootstrap or apply.');
+  if (!connectionString || !['bootstrap', 'apply', 'apply-identity'].includes(mode)) {
+    console.error('Set EDUAPP_DATABASE_URL and choose bootstrap, apply or apply-identity.');
     process.exitCode = 2;
   } else {
     try {
@@ -79,6 +98,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         } else {
           const applied = await applyTenantIsolation(client);
           console.log(`Tenant isolation migration ${applied ? 'applied' : 'already applied'}`);
+          if (mode === 'apply-identity') {
+            await applyIamSessions(client);
+            await applyAccessInvitations(client);
+            console.log('Identity migrations verified');
+          }
         }
       } finally {
         await client.end();

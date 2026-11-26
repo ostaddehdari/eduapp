@@ -91,6 +91,14 @@ jobs:
       - run: node scripts/validate-stage-gate-s01.mjs
       - name: Validate the S02 evidence gate
         run: node scripts/validate-stage-gate-s02.mjs
+      - name: Test authentication and session lifecycle
+        env:
+          EDUAPP_AUTH_PG_ADMIN_URL: postgres://eduapp_ci:eduapp_ci_only@127.0.0.1:55432/eduapp_s03_auth_test
+        run: node --test tests/S03-W01/*.test.mjs
+      - name: Test people and membership isolation
+        env:
+          EDUAPP_S03_W02_PG_ADMIN_URL: postgres://eduapp_ci:eduapp_ci_only@127.0.0.1:55432/eduapp_s03_w02_test
+        run: node --test --test-concurrency=1 tests/S03-W02/*.test.mjs
 
   runtime:
     name: ci / ${{ matrix.runtime }}

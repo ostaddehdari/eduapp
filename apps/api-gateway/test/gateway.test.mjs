@@ -51,6 +51,38 @@ test('limiter enforces retry seconds and liveness survives a failed limiter', as
   assert.doesNotMatch(JSON.stringify(body), /sensitive detail/);
 });
 
+test('identity adapters support bodyless operations and owner throttling', async t => {
+  const base = await start(t, {
+    authenticate: header => header === 'Bearer access-fixture' ? { actor: 'actor', scope: 'school' } : null,
+    routes: [
+      { id: 'refreshSession', budget, forwardAuthorization: true, handle({ authorization, body }) {
+        assert.equal(authorization, 'Bearer refresh-fixture');
+        assert.equal(body, undefined);
+        return { data: { status: 'rotated' } };
+      } },
+      { id: 'logout', budget, authorize: ({ identity }) => identity.actor === 'actor',
+        handle: () => ({ status: 204 }) },
+      { id: 'requestOtp', budget, handle(input) {
+        assert.equal(input.authorization, undefined);
+        assert.equal(input.body.login, 'fixture');
+        throw new GatewayError('RATE_LIMITED', { retryAfter: 7 });
+      } },
+    ],
+  });
+  const refresh = await fetch(base + '/auth/refresh', { method: 'POST', headers: { Authorization: 'Bearer refresh-fixture' } });
+  assert.equal(refresh.status, 200);
+  assert.equal((await refresh.json()).data.status, 'rotated');
+  const logout = await fetch(base + '/auth/logout', { method: 'POST', headers: { Authorization: 'Bearer access-fixture' } });
+  assert.equal(logout.status, 204);
+  const otp = await fetch(base + '/auth/otp/request', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer unrelated-fixture' },
+    body: JSON.stringify({ login: 'fixture' }),
+  });
+  await expectError(otp, 429, 'RATE_LIMITED');
+  assert.equal(otp.headers.get('retry-after'), '7');
+  await expectError(await fetch(base + '/auth/otp/request', { method: 'POST' }), 400, 'INVALID_REQUEST');
+});
+
 test('memory limiter resets only after the window expires', () => {
   let now = 0;
   const limiter = createMemoryRateLimiter({ clock: () => now, capacity: 1 });
