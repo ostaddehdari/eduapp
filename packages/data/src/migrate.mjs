@@ -92,11 +92,19 @@ export function applySecurityAudit(client) {
   return applyMigration(client, '0006-security-audit', foundationVersion);
 }
 
+export function applyTenantRegistry(client) {
+  return applyMigration(client, '0007-tenant-registry', '0004-access-policy');
+}
+
+export function applyOrganizationTree(client) {
+  return applyMigration(client, '0008-organization-tree', foundationVersion);
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const mode = process.argv[2];
   const connectionString = process.env.EDUAPP_DATABASE_URL;
-  if (!connectionString || !['bootstrap', 'apply', 'apply-identity'].includes(mode)) {
-    console.error('Set EDUAPP_DATABASE_URL and choose bootstrap, apply or apply-identity.');
+  if (!connectionString || !['bootstrap', 'apply', 'apply-identity', 'apply-tenancy'].includes(mode)) {
+    console.error('Set EDUAPP_DATABASE_URL and choose bootstrap, apply, apply-identity or apply-tenancy.');
     process.exitCode = 2;
   } else {
     try {
@@ -110,13 +118,18 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         } else {
           const applied = await applyTenantIsolation(client);
           console.log(`Tenant isolation migration ${applied ? 'applied' : 'already applied'}`);
-          if (mode === 'apply-identity') {
+          if (['apply-identity', 'apply-tenancy'].includes(mode)) {
             await applyIamSessions(client);
             await applyAccessInvitations(client);
             await applyAccessPolicy(client);
             await applyIamMfa(client);
             await applySecurityAudit(client);
             console.log('Identity migrations verified');
+          }
+          if (mode === 'apply-tenancy') {
+            await applyTenantRegistry(client);
+            await applyOrganizationTree(client);
+            console.log('Tenancy migrations verified');
           }
         }
       } finally {

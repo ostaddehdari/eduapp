@@ -76,6 +76,9 @@
     {"type": "attendance.confirmed.v1", "producer": "attendance", "consumers": ["notifications_integrations", "platform_audit_jobs"], "dedupe_key": "attendance_record_id+revision"},
     {"type": "notifications.delivery_updated.v1", "producer": "notifications_integrations", "consumers": ["platform_audit_jobs"], "dedupe_key": "message_attempt_id+status_revision"}
   ],
+  "event_contract_extensions": [
+    {"contract": "S04-W01", "type": "tenancy.tenant_created.v1", "producer": "tenancy_organization", "consumers": ["identity_access"], "dedupe_key": "tenant_id"}
+  ],
   "access_matrix": [
     {"actor": "api_gateway", "allow": ["authenticate", "rate_limit", "route"], "deny": ["direct_table_write", "final_domain_authorization"]},
     {"actor": "context_module", "allow": ["write_owned_tables", "authorize_owned_commands", "publish_versioned_event"], "deny": ["write_foreign_tables", "trust_external_tenant_id"]},

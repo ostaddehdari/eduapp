@@ -18,7 +18,10 @@ const errors = new Map([
   ['AUTHENTICATION_REQUIRED', [401, 'Authentication is required.']],
   ['FORBIDDEN', [403, 'Access denied.']],
   ['NOT_FOUND', [404, 'Resource not found.']],
+  ['ORG_PARENT_NOT_FOUND', [404, 'The parent organization unit is unavailable.']],
   ['CONFLICT', [409, 'The operation conflicts with the current state.']],
+  ['ORG_CODE_CONFLICT', [409, 'The organization code is already in use at this level.']],
+  ['ORG_CYCLE', [409, 'The organization unit cannot move below itself.']],
   ['IDEMPOTENCY_CONFLICT', [409, 'The key was used for a different request.']],
   ['IDEMPOTENCY_IN_PROGRESS', [409, 'A request for this key is in progress.']],
   ['PAYLOAD_TOO_LARGE', [413, 'The request body is too large.']],
@@ -242,7 +245,8 @@ export function createGateway({
           key.length < contract.idempotency.key_min_length || key.length > contract.idempotency.key_max_length) invalid();
         const namespace = [identity.scope, identity.actor, route.id, key];
         const fingerprint = createHash('sha256').update(canonical([route.method, route.path, params, query, body])).digest('hex');
-        result = await route.executeIdempotent({ namespace, fingerprint }, () => route.handle(input));
+        result = await route.executeIdempotent({ namespace, fingerprint }, idempotency =>
+          route.handle({ ...input, idempotency }));
       } else if (span && route.id === 'getReadiness') {
         result = await route.handle(input, span);
       } else {

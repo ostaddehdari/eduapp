@@ -17,7 +17,7 @@ import { GatewayError } from './gateway.mjs';
 
 export function createIdentityGatewayOptions({
   iamPool, peoplePool, accessPool, accessSigningKey, otpPepper, deliverOtp, mfaEncryptionKey,
-  authorize, accessPolicy, verifyOrgUnit, deliverInvitation, now,
+  authorize, accessPolicy, verifyOrgUnit, deliverInvitation, tenantActive, now,
 }) {
   const pools = [iamPool, peoplePool, accessPool];
   if (pools.some(pool => typeof pool?.connect !== 'function') || new Set(pools).size !== pools.length) {
@@ -36,7 +36,11 @@ export function createIdentityGatewayOptions({
   const audit = createSecurityAudit({ accessTransactions: transactions, peopleTransactions, iamPool });
   const access = createAccessRepository({ transactions, appendSecurityEvent: appendTenantSecurityEvent });
   const people = createPeopleRepository({ transactions: peopleTransactions });
-  const resolveMembership = input => access.resolveMembership(input);
+  const resolveMembership = async input => {
+    const membership = await access.resolveMembership(input);
+    if (membership && tenantActive && !await tenantActive(membership.tenantId)) return null;
+    return membership;
+  };
   const auth = createAuthService({
     pool: iamPool, resolveMembership, deliverOtp, accessSigningKey, otpPepper, now,
     audit: { appendIam: appendIamSecurityEvent, recordIam: audit.recordIam },
@@ -61,6 +65,7 @@ export function createIdentityGatewayOptions({
   const authOptions = createAuthGatewayOptions(auth, { GatewayError });
   return {
     authenticate: authOptions.authenticate,
+    authorizeTenancy: permissionService?.can,
     routes: [
       ...authOptions.routes,
       ...createPeopleRoutes({ service, GatewayError }),

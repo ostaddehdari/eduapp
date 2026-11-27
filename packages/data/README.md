@@ -6,6 +6,8 @@ This package implements [DATA-001](../../docs/contracts/S02-W03.md) using Postgr
 
 1. Have a provisioning administrator run `node packages/data/src/migrate.mjs bootstrap` with the administrator connection provided as `EDUAPP_DATABASE_URL`. Bootstrap grants named application logins access to the dedicated database and revokes ambient database and `public` schema access. Provision runtime and migration authentication separately using the deployment secret store.
 2. Run `node packages/data/src/migrate.mjs apply` with the `eduapp_schema_migrator` connection provided as `EDUAPP_DATABASE_URL`. The migration acquires a database-local lock and commits the schema and its checksum receipt together. Repeating the command checks the receipt and exits successfully if the applied SQL matches it.
+
+Use the `apply-tenancy` mode for a Gateway configured with Tenant Registry and Organization Tree. It verifies the foundation and Identity migrations, then applies the two Tenancy migrations. Use the same migration role and the dedicated environment's database.
 3. Build each owner-service pool with its own login, for example `eduapp_tenancy_api`. Use the transaction runner after resolving and authorizing the tenant in that owner service.
 
 The SQL includes a schema-owner role per owned schema and narrower logins for each owner and the runtimes authorized in the operating model. Billing catalog reads go through Billing. Catalog writes require separate controlled provisioning. Append-only tables omit the ordinary update and delete grants. The Platform outbox append function grants producers a scoped append operation and checks the logged-in role against the event type.

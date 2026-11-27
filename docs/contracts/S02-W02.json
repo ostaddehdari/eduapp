@@ -25,6 +25,11 @@
         "contract": "S03-W04",
         "owner": "identity_access",
         "operations": ["beginMfaEnrollment", "confirmMfaEnrollment", "verifyMfaStepUp", "requestMfaRecovery", "confirmMfaRecovery"]
+      },
+      {
+        "contract": "S04-W01",
+        "owner": "tenancy_organization",
+        "operations": ["updateTenantStatus"]
       }
     ],
     "domain_authorization": "domain_owner",
@@ -130,14 +135,16 @@
       "listNotificationRules",
       "listTemplates",
       "listMessageJobs",
-      "listProviders"
+      "listProviders",
+      "getOrgTree"
     ]
   },
   "concurrency": {
     "request_header": "If-Match",
     "response_header": "ETag",
     "required_operations": [
-      "updateRole"
+      "updateRole",
+      "moveOrgUnit"
     ],
     "missing": 428,
     "stale": 412,
