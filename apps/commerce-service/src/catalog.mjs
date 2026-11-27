@@ -57,7 +57,11 @@ export function createPlanCatalog({ pool, authorizePublish, authorizeQuote = asy
       const { rows: [row] } = await db.query(`
         INSERT INTO commercial_billing.plan_versions
           (plan_id,version,price_minor,currency,effective_at,modules,quotas,trial_days,term_days)
-        VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8,$9)
+        VALUES ($1,$2,$3,$4,
+          GREATEST($5::timestamptz,
+            COALESCE((SELECT max(effective_at) + interval '1 microsecond'
+              FROM commercial_billing.plan_versions WHERE plan_id = $1), $5::timestamptz)),
+          $6::jsonb,$7::jsonb,$8,$9)
         RETURNING id,plan_id,version,price_minor,currency,effective_at,modules,quotas,trial_days,term_days
       `, [plan.id, body.expectedVersion + 1, body.priceMinor, body.currency, now(),
         JSON.stringify(body.modules), JSON.stringify(body.quotas), body.trialDays, body.termDays]);

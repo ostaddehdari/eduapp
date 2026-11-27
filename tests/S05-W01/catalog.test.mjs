@@ -47,7 +47,8 @@ test('catalog versions, discount quotes and tenant boundaries on PostgreSQL 17',
   assert.equal(await applyPlanCatalog(migrator), false);
   const pool = new pg.Pool({ connectionString: roleUrl.href, max: 4 });
   t.after(() => pool.end());
-  const clock = () => new Date('2026-11-27T12:00:00Z');
+  let tick = 0;
+  const clock = () => new Date(Date.parse('2026-11-27T12:00:00Z') + 1000 * tick++);
   const owner = { actor: randomUUID() };
   const catalog = createPlanCatalog({
     pool, authorizePublish: ({ identity }) => identity === owner,
