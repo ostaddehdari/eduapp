@@ -4,6 +4,7 @@ import '@eduapp/ui-tokens/theme.css';
 import { formatPersianTimestamp, readSchoolPreview, schoolOptions } from '@eduapp/ui-tokens/preview';
 import { welcomeTitle } from './app-model';
 import { Onboarding } from './onboarding';
+import { Management } from './management';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('ROOT_ELEMENT_MISSING');
@@ -12,6 +13,7 @@ const choices = query.getAll('school');
 const schoolQuery = choices.length > 1 ? choices : choices[0];
 const school = readSchoolPreview(schoolQuery);
 const showOnboarding = query.get('view') === 'onboarding';
+const showManagement = query.get('view') === 'management';
 const changed = formatPersianTimestamp(school?.updatedAt);
 
 createRoot(root).render(
@@ -21,12 +23,14 @@ createRoot(root).render(
       <div className="edu-frame edu-bar">
         <a className="edu-brand" href="./" lang="en" dir="ltr">EduApp</a>
         <nav className="edu-nav" aria-label="ناوبری پنل">
-          <a href={showOnboarding ? './' : '#school-preview'}>نمای کلی</a>
+          <a href={showOnboarding || showManagement ? './' : '#school-preview'}>نمای کلی</a>
           <a href="?view=onboarding" aria-current={showOnboarding ? 'page' : undefined}>راه‌اندازی مدرسه</a>
+          <a href="?view=management" aria-current={showManagement ? 'page' : undefined}>مدیریت مجموعه</a>
         </nav>
       </div>
     </header>
-    {showOnboarding ? <Onboarding configuredApi={import.meta.env.VITE_EDUAPP_API_BASE} schoolQuery={schoolQuery} /> :
+    {showManagement ? <Management configuredApi={import.meta.env.VITE_EDUAPP_API_BASE} sample={query.get('sample') ?? ''} /> :
+    showOnboarding ? <Onboarding configuredApi={import.meta.env.VITE_EDUAPP_API_BASE} schoolQuery={schoolQuery} /> :
     <main id="main" className="edu-frame edu-shell edu-shell--panel" tabIndex={-1}>
       <section className="edu-intro" aria-labelledby="page-title">
         <p className="edu-context">پنل مدیریت EduApp</p>

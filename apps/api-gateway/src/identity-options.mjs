@@ -18,7 +18,8 @@ import { GatewayError } from './gateway.mjs';
 
 export function createIdentityGatewayOptions({
   iamPool, peoplePool, accessPool, accessSigningKey, otpPepper, deliverOtp, mfaEncryptionKey,
-  authorize, accessPolicy, verifyOrgUnit, deliverInvitation, tenantActive, scopedInvitations, now,
+  authorize, accessPolicy, verifyOrgUnit, deliverInvitation, tenantActive, scopedInvitations, registryOwnerFields,
+  allowPlatformStepUp, now,
 }) {
   const pools = [iamPool, peoplePool, accessPool];
   if (pools.some(pool => typeof pool?.connect !== 'function') || new Set(pools).size !== pools.length) {
@@ -47,12 +48,12 @@ export function createIdentityGatewayOptions({
     audit: { appendIam: appendIamSecurityEvent, recordIam: audit.recordIam },
   });
   const mfa = mfaEncryptionKey === undefined ? null : createMfaService({
-    pool: iamPool, encryptionKey: mfaEncryptionKey, otpPepper, now,
+    pool: iamPool, encryptionKey: mfaEncryptionKey, otpPepper, allowPlatformStepUp, now,
   });
   const requireRecentMfa = identity => mfa?.isFresh(identity) ?? false;
   const permissionService = accessPolicy ? createAccessService({
     repository: createPostgresAccessRepository({
-      transactions, appendSecurityEvent: appendTenantSecurityEvent, registryOwnerInvitations: scopedInvitations,
+      transactions, appendSecurityEvent: appendTenantSecurityEvent, registryOwnerInvitations: scopedInvitations, registryOwnerFields,
     }),
     resolveMembership, verifyGuardian: accessPolicy.verifyGuardian,
     hasEntitlement: accessPolicy.hasEntitlement, verifyOrgUnit, requireRecentMfa, now,
@@ -70,6 +71,7 @@ export function createIdentityGatewayOptions({
   return {
     authenticate: authOptions.authenticate,
     authorizeTenancy: permissionService?.can,
+    requireRecentMfa,
     inviteManager: ({ commandId, ...input }) => service.createInvitation({ ...input, requestKey: commandId }),
     routes: [
       ...authOptions.routes,

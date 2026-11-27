@@ -13,6 +13,12 @@ export const actions = Object.freeze({
   'tenancy.tenant.read': [],
   'tenancy.org.read': [],
   'tenancy.org.write': [],
+  'fields.definition.read': [],
+  'fields.definition.write': [],
+  'fields.school.read': [],
+  'fields.school.write': [],
+  'fields.student.read': [],
+  'fields.student.write': [],
 });
 
 const privileged = new Set(['access.role.read', 'access.role.write', 'access.role.assign', 'tenancy.org.write']);

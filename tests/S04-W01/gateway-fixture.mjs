@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import pg from 'pg';
 import {
   applyAccessInvitations, applyAccessPolicy, applyIamMfa, applyIamSessions, applyOrganizationTree,
-  applyOnboarding, applyScopedOrgManagement, applySecurityAudit, applyTenantIsolation, applyTenantRegistry, runSqlBootstrap,
+  applyManagementPanel, applyOnboarding, applyScopedOrgManagement, applySecurityAudit, applyTenantIsolation, applyTenantRegistry, runSqlBootstrap,
 } from '../../packages/data/src/migrate.mjs';
 
 const migrations = [
@@ -11,7 +11,7 @@ const migrations = [
   applySecurityAudit, applyTenantRegistry, applyOrganizationTree, applyScopedOrgManagement, applyOnboarding,
 ];
 
-export async function tenancyFixture(t, { includeOnboarding = false } = {}) {
+export async function tenancyFixture(t, { includeOnboarding = false, includeManagement = false } = {}) {
   const configured = process.env.EDUAPP_S04_REGISTRY_PG_ADMIN_URL;
   assert(configured, 'Set EDUAPP_S04_REGISTRY_PG_ADMIN_URL for disposable PostgreSQL 17');
   const url = new URL(configured);
@@ -47,6 +47,7 @@ export async function tenancyFixture(t, { includeOnboarding = false } = {}) {
   await migrator.connect();
   try {
     for (const apply of migrations) await apply(migrator);
+    if (includeManagement) await applyManagementPanel(migrator);
   } finally {
     await migrator.end();
   }
@@ -55,6 +56,7 @@ export async function tenancyFixture(t, { includeOnboarding = false } = {}) {
     iamPool: 'eduapp_iam_api', peoplePool: 'eduapp_people_api', accessPool: 'eduapp_access_api',
     tenancyPool: 'eduapp_tenancy_api',
     ...(includeOnboarding ? { schoolPool: 'eduapp_school_api', sitesPool: 'eduapp_sites_api' } : {}),
+    ...(includeManagement ? { billingPool: 'eduapp_billing_api' } : {}),
   })) {
     const pool = new pg.Pool({ connectionString: await credentials(role), max: 2, connectionTimeoutMillis: 3000 });
     t.after(() => pool.end());

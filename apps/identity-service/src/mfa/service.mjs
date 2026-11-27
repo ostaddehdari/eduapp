@@ -74,7 +74,7 @@ function decodeRecoveryTicket(value) {
     : null;
 }
 
-export function createMfaService({ pool, encryptionKey, otpPepper, now = Date.now }) {
+export function createMfaService({ pool, encryptionKey, otpPepper, allowPlatformStepUp, now = Date.now }) {
   if (!Buffer.isBuffer(encryptionKey) || encryptionKey.length !== 32 ||
       !Buffer.isBuffer(otpPepper) || otpPepper.length < 32 || encryptionKey.equals(otpPepper)) {
     throw new TypeError('MFA requires a distinct 32-byte encryption key and OTP pepper');
@@ -82,6 +82,13 @@ export function createMfaService({ pool, encryptionKey, otpPepper, now = Date.no
   const key = Buffer.from(encryptionKey);
   const attemptsKey = Buffer.from(otpPepper);
   const repo = createAuthRepository(pool);
+
+  async function canStepUp(identity) {
+    if (!hasCurrentContext(identity)) return false;
+    if (isUuid(identity.tenantId) && isUuid(identity.membershipId)) return true;
+    return identity.tenantId === null && identity.membershipId === null &&
+      await allowPlatformStepUp?.(identity) === true;
+  }
 
   async function rateLimit(identity, action, attempts) {
     if (!hasCurrentContext(identity)) throw unauthorized();
@@ -181,7 +188,7 @@ export function createMfaService({ pool, encryptionKey, otpPepper, now = Date.no
 
     async stepUp(identity, { code }) {
       needCode(code);
-      if (!isUuid(identity?.tenantId) || !isUuid(identity.membershipId)) throw unauthorized();
+      if (!await canStepUp(identity)) throw unauthorized();
       await rateLimit(identity, 'mfa_step_up', 8);
       const outcome = await repo.transaction(async (db) => {
         const instant = now();
@@ -208,14 +215,15 @@ export function createMfaService({ pool, encryptionKey, otpPepper, now = Date.no
     },
 
     async isFresh(identity) {
-      if (!hasCurrentContext(identity) || !isUuid(identity.tenantId) || !isUuid(identity.membershipId)) return false;
+      if (!await canStepUp(identity)) return false;
       const instant = now();
       const { rowCount } = await repo.query(`
         SELECT 1 FROM identity_access.sessions s
         JOIN identity_access.mfa_factors f ON f.identity_id = s.identity_id
         JOIN identity_access.identities i ON i.id = s.identity_id
         WHERE s.id = $1 AND s.identity_id = $2 AND s.revision = $3
-          AND s.tenant_id = $4 AND s.membership_id = $5 AND s.revoked_at IS NULL
+          AND s.tenant_id IS NOT DISTINCT FROM $4::uuid
+          AND s.membership_id IS NOT DISTINCT FROM $5::uuid AND s.revoked_at IS NULL
           AND s.expires_at > $6 AND s.access_expires_at > $6 AND i.status = 'active'
           AND s.mfa_verified_at <= $6 AND s.mfa_verified_at > $7
           AND s.mfa_session_revision = s.revision AND s.mfa_factor_revision = f.revision
