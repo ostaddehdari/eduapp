@@ -2,6 +2,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const eventRoutes = Object.freeze({
   'identity.session_revoked.v1': Object.freeze(['platform_audit_jobs']),
+  'tenancy.tenant_created.v1': Object.freeze(['identity_access']),
   'tenancy.org_unit_changed.v1': Object.freeze(['identity_access', 'school_enrollment']),
   'people.profile_changed.v1': Object.freeze(['school_enrollment']),
   'fields.definition_published.v1': Object.freeze(['sites_content', 'school_enrollment']),

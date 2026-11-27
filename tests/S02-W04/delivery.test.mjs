@@ -78,7 +78,8 @@ function brokerFixture() {
 
 test('broker routes follow the versioned owner and consumer contract', async () => {
   const contract = JSON.parse(await readFile(new URL('../../docs/contracts/S01-W03.json', import.meta.url), 'utf8'));
-  assert.deepEqual(eventRoutes, Object.fromEntries(contract.event_contracts.map(event => [event.type, event.consumers])));
+  const events = [...contract.event_contracts, ...contract.event_contract_extensions];
+  assert.deepEqual(eventRoutes, Object.fromEntries(events.map(event => [event.type, event.consumers])));
 });
 
 test('outage retains the outbox row and replay preserves one effect per tenant', async () => {

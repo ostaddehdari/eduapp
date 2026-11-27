@@ -113,6 +113,11 @@ jobs:
         run: node --test --test-concurrency=1 tests/S03-W05/*.test.mjs
       - name: Validate the S03 evidence gate
         run: node scripts/validate-stage-gate-s03.mjs
+      - name: Test tenant provisioning and organization tree isolation
+        env:
+          EDUAPP_S04_REGISTRY_PG_ADMIN_URL: postgres://eduapp_ci:eduapp_ci_only@127.0.0.1:55432/eduapp_s04_registry_test
+          EDUAPP_S04_ORG_PG_ADMIN_URL: postgres://eduapp_ci:eduapp_ci_only@127.0.0.1:55432/eduapp_s04_org_test
+        run: node --test --test-concurrency=1 tests/S04-W0[12]/*.test.mjs
 
   runtime:
     name: ci / ${{ matrix.runtime }}

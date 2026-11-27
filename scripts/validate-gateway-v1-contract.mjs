@@ -99,7 +99,7 @@ assert.ok(pagination.limit_default > 0 && pagination.limit_default <= pagination
 assert.ok(Number.isSafeInteger(pagination.cursor_ttl_seconds) && pagination.cursor_ttl_seconds > 0);
 assert.deepEqual(pagination.bound_to, ['operation', 'verified_scope', 'normalized_query']);
 assert.equal(pagination.cross_scope_cursor, pagination.invalid_cursor);
-assert.deepEqual(pagination.operation_ids, [...operations.keys()].filter(id => id.startsWith('list')));
+assert.deepEqual(pagination.operation_ids, [...operations.keys()].filter(id => id.startsWith('list')).concat('getOrgTree'));
 for (const id of pagination.operation_ids) assert.equal(operations.get(id).method, 'get');
 assert.ok(schemas.PageMeta.allOf.some(schema => schema.required?.includes('nextCursor')));
 
@@ -119,8 +119,9 @@ assert.ok(!idempotency.client_operations.includes(callback.operationId));
 assert.equal(idempotency.durable_outcome_owner, 'domain_owner');
 assert.equal(parameters.IfMatch.name, concurrency.request_header);
 assert.equal(parameters.IfMatch.required, true);
-assert.deepEqual(concurrency.required_operations, ['updateRole']);
+assert.deepEqual(concurrency.required_operations, ['updateRole', 'moveOrgUnit']);
 assert.equal(operations.get('updateRole').method, 'patch');
+assert.equal(operations.get('moveOrgUnit').method, 'post');
 assert.equal(concurrency.missing, 428);
 assert.equal(concurrency.stale, 412);
 

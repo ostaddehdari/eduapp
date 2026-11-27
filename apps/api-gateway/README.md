@@ -13,6 +13,10 @@ curl http://127.0.0.1:3010/v1/health/live
 
 SDK فعلی تایپ و متدهای سه مسیر اجرایی را ارائه می‌کند. مولد و diff در خود مخزن نسخه‌گذاری شده‌اند. تغییرات کاتالوگ و قرارداد اجرایی در CI با آخرین نسخهٔ شاخهٔ مقصد مقایسه می‌شوند. افزودن مسیر اجرایی و SDK برای عملیات دامنه باید همزمان با اتصال سرویس مالک و تکمیل قرارداد ورودی و خروجی انجام شود.
 
+برای اتصال رجیستری مشتری و درخت سازمانی، در `createGatewayRuntime` گزینهٔ `tenancy` را با استخر مستقل `eduapp_tenancy_api` و دو تصمیم‌گیر مورد اعتماد `authorizeProvisioning` و `authorizeStatusChange` بسازید. در ترکیب با IAM، سیاست Access مجوز مالک مدرسه را بررسی می‌کند و نشست مدرسهٔ تعلیق‌شده در Gateway رد می‌شود. پایگاه داده باید migrationهای `apply-tenancy` را داشته باشد. قراردادهای عملیات و نمونهٔ اجرای همین ترکیب در آزمون‌ها موجود است.
+
+[رجیستری مشتری](../../docs/contracts/S04-W01.md) · [درخت سازمانی](../../docs/contracts/S04-W02.md) · [آزمون Gateway روی PostgreSQL](../../tests/S04-W01/gateway-tenancy.test.mjs)
+
 ```bash
 node scripts/gateway-contract.mjs generate
 node scripts/gateway-contract.mjs check

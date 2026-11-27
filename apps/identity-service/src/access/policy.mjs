@@ -10,9 +10,12 @@ export const actions = Object.freeze({
   'people.user.read': ['id', 'displayName'],
   'people.user.write': [],
   'school.student.read': ['studentId', 'displayName', 'gradeLevel', 'attendanceStatus'],
+  'tenancy.tenant.read': [],
+  'tenancy.org.read': [],
+  'tenancy.org.write': [],
 });
 
-const privileged = new Set(['access.role.read', 'access.role.write', 'access.role.assign']);
+const privileged = new Set(['access.role.read', 'access.role.write', 'access.role.assign', 'tenancy.org.write']);
 
 export class AccessError extends Error {}
 
