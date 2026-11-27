@@ -31,9 +31,11 @@ function view(row) {
   };
 }
 
-export function createPlanCatalog({ pool, authorizePublish, now = () => new Date() }) {
+export function createPlanCatalog({ pool, authorizePublish, authorizeQuote = async () => false, now = () => new Date() }) {
   if (typeof pool?.connect !== 'function' || typeof pool?.query !== 'function' ||
-    typeof authorizePublish !== 'function') throw new TypeError('Billing owner and publisher policy required');
+    typeof authorizePublish !== 'function' || typeof authorizeQuote !== 'function') {
+    throw new TypeError('Billing owner and independent authorization policies required');
+  }
   const transactions = createTenantTransactions(pool);
 
   async function publish(identity, body) {
@@ -99,6 +101,7 @@ export function createPlanCatalog({ pool, authorizePublish, now = () => new Date
   async function quote({ identity, planVersionId, discountCode }) {
     if (!uuid(identity?.tenantId) || identity.scope !== identity.tenantId || !uuid(planVersionId) ||
       (discountCode !== undefined && !couponKey(discountCode))) fail('INVALID_REQUEST');
+    if (await authorizeQuote({ identity, action: 'billing.quote.read' }) !== true) fail('FORBIDDEN');
     return transactions.run(identity.tenantId, async db => {
       const { rows: [row] } = await db.query(`
         SELECT v.id,v.plan_id,p.code,v.version,v.price_minor,v.currency,v.modules,v.quotas,

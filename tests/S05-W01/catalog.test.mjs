@@ -50,7 +50,8 @@ test('catalog versions, discount quotes and tenant boundaries on PostgreSQL 17',
   const clock = () => new Date('2026-11-27T12:00:00Z');
   const owner = { actor: randomUUID() };
   const catalog = createPlanCatalog({
-    pool, authorizePublish: ({ identity }) => identity === owner, now: clock,
+    pool, authorizePublish: ({ identity }) => identity === owner,
+    authorizeQuote: ({ identity }) => identity?.scope === identity?.tenantId, now: clock,
   });
   const offer = {
     code: 'school_plus', expectedVersion: 0, priceMinor: 100_000, currency: 'IRR',
