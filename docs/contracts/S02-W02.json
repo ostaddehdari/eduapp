@@ -20,6 +20,13 @@
     "internal_prefix": "/v1",
     "route_owner": "source_of_truth_api_tag_ownership",
     "existing_operation_count": 64,
+    "versioned_extensions": [
+      {
+        "contract": "S03-W04",
+        "owner": "identity_access",
+        "operations": ["beginMfaEnrollment", "confirmMfaEnrollment", "verifyMfaStepUp", "requestMfaRecovery", "confirmMfaRecovery"]
+      }
+    ],
     "domain_authorization": "domain_owner",
     "trusted_tenant_context": "verified_session_membership_and_scope",
     "accept_client_context_headers": false,

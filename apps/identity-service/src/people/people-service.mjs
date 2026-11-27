@@ -25,7 +25,9 @@ export function hasPeopleScope(identity) {
     identity.scope === identity.tenantId;
 }
 
-export function createPeopleService({ people, access, authorize, findActiveIdentity, verifyOrgUnit, deliverInvitation }) {
+export function createPeopleService({
+  people, access, authorize, findActiveIdentity, verifyOrgUnit, deliverInvitation, requireRecentMfa, projectProfile,
+}) {
   if (typeof authorize !== 'function' || typeof findActiveIdentity !== 'function') {
     throw new TypeError('People requires owned authorization and identity resolution');
   }
@@ -54,22 +56,31 @@ export function createPeopleService({ people, access, authorize, findActiveIdent
     const identityId = uuid(body.identityId);
     const orgUnitId = body.orgUnitId == null ? null : uuid(body.orgUnitId);
     const scope = await authorizedScope(identity, action, orgUnitId);
+    if (await requireRecentMfa?.(identity) !== true) fail('FORBIDDEN');
     if (!await activeIdentity(identityId)) fail('NOT_FOUND');
     return { scope, target: { tenantId: scope.tenantId, identityId, orgUnitId } };
   }
 
+  async function project(scope, profile) {
+    if (typeof projectProfile !== 'function') return profile;
+    const result = await projectProfile({ ...scope, profile });
+    if (result === null) fail('NOT_FOUND');
+    return result;
+  }
+
   return Object.freeze({
     async listUsers({ identity, page }) {
-      const { tenantId } = await authorizedScope(identity, 'people.user.read', null);
+      const scope = await authorizedScope(identity, 'people.user.read', null);
       if (!Number.isInteger(page?.limit) || page.limit < 1 || page.limit > 100) fail('VALIDATION_FAILED');
       const position = page.position == null ? null : uuid(page.position);
-      return people.list({ tenantId, position, limit: page.limit });
+      const result = await people.list({ tenantId: scope.tenantId, position, limit: page.limit });
+      return { ...result, data: await project(scope, result.data) };
     },
     async getUser({ identity, profileId }) {
-      const { tenantId } = await authorizedScope(identity, 'people.user.read', null);
-      const found = await people.get({ tenantId, profileId: uuid(profileId) });
+      const scope = await authorizedScope(identity, 'people.user.read', null);
+      const found = await people.get({ tenantId: scope.tenantId, profileId: uuid(profileId) });
       if (!found) fail('NOT_FOUND');
-      return found;
+      return project(scope, found);
     },
     async createUser({ identity, body }) {
       const { tenantId } = await authorizedScope(identity, 'people.user.write', null);

@@ -223,7 +223,7 @@ export function createAuthService({ pool, resolveMembership, deliverOtp, accessS
       const instant = now();
       if (!isCurrentAccessToken(accessToken, accessKey, instant)) return null;
       const { rows: [session] } = await repo.query(`
-        SELECT s.id, s.identity_id, s.tenant_id, s.membership_id
+        SELECT s.id, s.identity_id, s.tenant_id, s.membership_id, s.revision
         FROM identity_access.sessions s JOIN identity_access.identities i ON i.id = s.identity_id
         WHERE s.access_hash = $1 AND s.revoked_at IS NULL AND s.access_expires_at > $2
           AND s.expires_at > $2 AND i.status = 'active'
@@ -232,7 +232,7 @@ export function createAuthService({ pool, resolveMembership, deliverOtp, accessS
       const scope = await confirmSelection(session.identity_id, {
         tenantId: session.tenant_id, membershipId: session.membership_id,
       });
-      return scope && { identityId: session.identity_id, sessionId: session.id, ...scope };
+      return scope && { identityId: session.identity_id, sessionId: session.id, sessionRevision: session.revision, ...scope };
     },
 
     async logout({ identityId, sessionId }) {

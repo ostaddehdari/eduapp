@@ -50,7 +50,16 @@ for (const [path, items] of Object.entries(catalog.paths)) {
     operations.set(op.operationId, { ...op, path, method, owner: routeOwners.get(op.tags[0]) });
   }
 }
-assert.equal(operations.size, routing.existing_operation_count);
+const approvedExtensions = new Set();
+for (const extension of routing.versioned_extensions ?? []) {
+  assert.match(extension.contract, /^S\d{2}-W\d{2}$/);
+  for (const id of extension.operations) {
+    assert.ok(!approvedExtensions.has(id), 'Duplicate extension operation: ' + id);
+    assert.equal(operations.get(id)?.owner, extension.owner, 'Unexpected owner: ' + id);
+    approvedExtensions.add(id);
+  }
+}
+assert.equal(operations.size, routing.existing_operation_count + approvedExtensions.size);
 const callback = operations.get(routing.provider_callback_operation);
 assert.equal(callback.owner, routing.provider_callback_owner);
 assert.equal(callback.method, 'post');

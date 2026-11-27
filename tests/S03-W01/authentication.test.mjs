@@ -123,7 +123,7 @@ test('Gateway authentication and sessions with real PostgreSQL', { timeout: 35_0
     assert.equal(result.status, 200);
     assert.equal(result.headers.get('cache-control'), 'no-store');
     assert.equal(result.data.tenantId, roleA.tenantId);
-    assert.deepEqual(await auth.authenticate(result.data.accessToken), { identityId, sessionId: result.data.sessionId, ...roleA });
+    assert.deepEqual(await auth.authenticate(result.data.accessToken), { identityId, sessionId: result.data.sessionId, sessionRevision: 1, ...roleA });
     const row = (await iam.query('SELECT access_hash, refresh_hash FROM identity_access.sessions WHERE id = $1',
       [result.data.sessionId])).rows[0];
     assert.deepEqual(row, { access_hash: digest(result.data.accessToken), refresh_hash: digest(result.data.refreshToken) });
