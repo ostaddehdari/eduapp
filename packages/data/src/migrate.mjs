@@ -100,6 +100,14 @@ export function applyOrganizationTree(client) {
   return applyMigration(client, '0008-organization-tree', foundationVersion);
 }
 
+export function applyScopedOrgManagement(client) {
+  return applyMigration(client, '0009-scoped-org-management', '0008-organization-tree');
+}
+
+export function applyOnboarding(client) {
+  return applyMigration(client, '0010-onboarding', '0009-scoped-org-management');
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const mode = process.argv[2];
   const connectionString = process.env.EDUAPP_DATABASE_URL;
@@ -129,6 +137,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
           if (mode === 'apply-tenancy') {
             await applyTenantRegistry(client);
             await applyOrganizationTree(client);
+            await applyScopedOrgManagement(client);
+            await applyOnboarding(client);
             console.log('Tenancy migrations verified');
           }
         }

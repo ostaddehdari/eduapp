@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { createAuthService } from '../../identity-service/src/auth/service.mjs';
 import {
   appendIamSecurityEvent, appendTenantSecurityEvent, createSecurityAudit,
@@ -17,7 +18,7 @@ import { GatewayError } from './gateway.mjs';
 
 export function createIdentityGatewayOptions({
   iamPool, peoplePool, accessPool, accessSigningKey, otpPepper, deliverOtp, mfaEncryptionKey,
-  authorize, accessPolicy, verifyOrgUnit, deliverInvitation, tenantActive, now,
+  authorize, accessPolicy, verifyOrgUnit, deliverInvitation, tenantActive, scopedInvitations, now,
 }) {
   const pools = [iamPool, peoplePool, accessPool];
   if (pools.some(pool => typeof pool?.connect !== 'function') || new Set(pools).size !== pools.length) {
@@ -34,7 +35,7 @@ export function createIdentityGatewayOptions({
   const transactions = createTenantTransactions(accessPool);
   const peopleTransactions = createTenantTransactions(peoplePool);
   const audit = createSecurityAudit({ accessTransactions: transactions, peopleTransactions, iamPool });
-  const access = createAccessRepository({ transactions, appendSecurityEvent: appendTenantSecurityEvent });
+  const access = createAccessRepository({ transactions, appendSecurityEvent: appendTenantSecurityEvent, scopedInvitations });
   const people = createPeopleRepository({ transactions: peopleTransactions });
   const resolveMembership = async input => {
     const membership = await access.resolveMembership(input);
@@ -50,7 +51,9 @@ export function createIdentityGatewayOptions({
   });
   const requireRecentMfa = identity => mfa?.isFresh(identity) ?? false;
   const permissionService = accessPolicy ? createAccessService({
-    repository: createPostgresAccessRepository({ transactions, appendSecurityEvent: appendTenantSecurityEvent }),
+    repository: createPostgresAccessRepository({
+      transactions, appendSecurityEvent: appendTenantSecurityEvent, registryOwnerInvitations: scopedInvitations,
+    }),
     resolveMembership, verifyGuardian: accessPolicy.verifyGuardian,
     hasEntitlement: accessPolicy.hasEntitlement, verifyOrgUnit, requireRecentMfa, now,
   }) : null;
@@ -60,15 +63,17 @@ export function createIdentityGatewayOptions({
     projectProfile: permissionService ? createPeopleFieldProjection(permissionService) : undefined,
     findActiveIdentity: input => auth.findActiveIdentity(input),
     verifyOrgUnit, deliverInvitation, requireRecentMfa,
+    invitationKey: scopedInvitations ? createHmac('sha256', otpPepper).update('eduapp-scoped-invitations-v1').digest() : undefined,
     recordSecurityEvent: audit.recordTenant,
   });
   const authOptions = createAuthGatewayOptions(auth, { GatewayError });
   return {
     authenticate: authOptions.authenticate,
     authorizeTenancy: permissionService?.can,
+    inviteManager: ({ commandId, ...input }) => service.createInvitation({ ...input, requestKey: commandId }),
     routes: [
       ...authOptions.routes,
-      ...createPeopleRoutes({ service, GatewayError }),
+      ...createPeopleRoutes({ service, GatewayError, scopedInvitations }),
       ...(permissionService ? createAccessRoutes({ access: permissionService, makeError: code => new GatewayError(code) }) : []),
       ...(mfa ? createMfaRoutes({ mfa, GatewayError }) : []),
     ],

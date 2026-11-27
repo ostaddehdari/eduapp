@@ -33,7 +33,47 @@ async function ensureMembership(connection, { tenantId, identityId, orgUnitId },
   return rows[0] ? membershipRecord(rows[0]) : null;
 }
 
-export function createAccessRepository({ transactions, appendSecurityEvent }) {
+async function liveInvitationScope(connection, orgUnitId) {
+  const result = await connection.query('SELECT tenancy_organization.invitation_scope_live($1) AS live', [orgUnitId]);
+  return result.rows[0].live === true;
+}
+
+function issuedInvitation(row) {
+  return { invitationId: row.id, expiresAt: row.expires_at.toISOString() };
+}
+
+async function issueScopedInvitation(connection, target, onCreated) {
+  const { tenantId, identityId, orgUnitId, invitedByMembershipId, tokenHash, requestKey, expiresInHours } = target;
+  if (!await liveInvitationScope(connection, orgUnitId)) return { outcome: 'missing' };
+  const issuer = await connection.query(`
+    SELECT 1 FROM identity_access.memberships
+    WHERE tenant_id = $1 AND id = $2 AND (org_unit_id IS NULL OR org_unit_id = $3) AND ${active}
+    FOR SHARE
+  `, [tenantId, invitedByMembershipId, orgUnitId]);
+  if (!issuer.rowCount) return { outcome: 'missing' };
+  const { rows: [inserted] } = await connection.query(`
+    INSERT INTO identity_access.invitations
+      (tenant_id, id, identity_id, org_unit_id, invited_by_membership_id, token_hash, request_key, expires_at)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,statement_timestamp() + make_interval(hours => $8::integer))
+    ON CONFLICT (tenant_id, invited_by_membership_id, request_key) WHERE request_key IS NOT NULL DO NOTHING
+    RETURNING id, expires_at
+  `, [tenantId, randomUUID(), identityId, orgUnitId, invitedByMembershipId, tokenHash, requestKey, expiresInHours]);
+  if (inserted) {
+    await onCreated(inserted.id);
+    return { ...issuedInvitation(inserted), outcome: 'pending' };
+  }
+  const { rows: [existing] } = await connection.query(`
+    SELECT id, expires_at, delivered_at,
+      identity_id = $4 AND org_unit_id IS NOT DISTINCT FROM $5::uuid AND token_hash = $6
+        AND expires_at = created_at + make_interval(hours => $7::integer) AS same_command,
+      expires_at > statement_timestamp() AND revoked_at IS NULL AS live
+    FROM identity_access.invitations WHERE tenant_id = $1 AND invited_by_membership_id = $2 AND request_key = $3
+  `, [tenantId, invitedByMembershipId, requestKey, identityId, orgUnitId, tokenHash, expiresInHours]);
+  if (!existing?.same_command || (!existing.delivered_at && !existing.live)) return { outcome: 'conflict' };
+  return { ...issuedInvitation(existing), outcome: existing.delivered_at ? 'delivered' : 'pending' };
+}
+
+export function createAccessRepository({ transactions, appendSecurityEvent, scopedInvitations = false }) {
   return Object.freeze({
     resolveMembership({ tenantId, identityId, membershipId }) {
       return transactions.run(tenantId, async (connection) => {
@@ -64,8 +104,14 @@ export function createAccessRepository({ transactions, appendSecurityEvent }) {
         });
       }));
     },
-    issueInvitation({ tenantId, identityId, orgUnitId, invitedByMembershipId, tokenHash }, auditContext) {
+    issueInvitation(target, auditContext) {
+      const { tenantId, identityId, orgUnitId, invitedByMembershipId, tokenHash } = target;
       return transactions.run(tenantId, async (connection) => {
+        async function audit(id) {
+          if (!auditContext) return;
+          await appendSecurityEvent?.(connection, { ...auditContext, event: 'security.invitation_delegated.v1', resourceId: id });
+        }
+        if (scopedInvitations) return issueScopedInvitation(connection, target, audit);
         const id = randomUUID();
         const { rows } = await connection.query(
           `INSERT INTO identity_access.invitations
@@ -73,10 +119,17 @@ export function createAccessRepository({ transactions, appendSecurityEvent }) {
            VALUES ($1, $2, $3, $4, $5, $6) RETURNING expires_at`,
           [tenantId, id, identityId, orgUnitId, invitedByMembershipId, tokenHash],
         );
-        if (auditContext) {
-          await appendSecurityEvent?.(connection, { ...auditContext, event: 'security.invitation_delegated.v1', resourceId: id });
-        }
+        await audit(id);
         return { invitationId: id, expiresAt: rows[0].expires_at.toISOString() };
+      });
+    },
+    markInvitationDelivered({ tenantId, invitationId }) {
+      return transactions.run(tenantId, async (connection) => {
+        const result = await connection.query(`
+          UPDATE identity_access.invitations SET delivered_at = COALESCE(delivered_at, statement_timestamp())
+          WHERE tenant_id = $1 AND id = $2 AND revoked_at IS NULL AND expires_at > statement_timestamp()
+        `, [tenantId, invitationId]);
+        return result.rowCount === 1;
       });
     },
     revokeUndeliveredInvitation({ tenantId, invitationId }) {
@@ -91,10 +144,12 @@ export function createAccessRepository({ transactions, appendSecurityEvent }) {
           `SELECT id, org_unit_id FROM identity_access.invitations
             WHERE tenant_id = $1 AND identity_id = $2 AND token_hash = $3
               AND accepted_at IS NULL AND revoked_at IS NULL
+              ${scopedInvitations ? 'AND delivered_at IS NOT NULL' : ''}
             FOR UPDATE`, [tenantId, identityId, tokenHash],
         );
         const invitation = rows[0];
         if (!invitation) return null;
+        if (scopedInvitations && !await liveInvitationScope(connection, invitation.org_unit_id)) return null;
         const live = await connection.query(
           'SELECT 1 FROM identity_access.invitations WHERE tenant_id = $1 AND id = $2 AND expires_at > statement_timestamp()',
           [tenantId, invitation.id],

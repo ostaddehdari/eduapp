@@ -15,13 +15,26 @@ export function createGatewayRuntime({ monitoring, gatewayOptions = {}, identity
   if (tenancy && !tenancy.authorize && !identity?.accessPolicy) {
     throw new TypeError('Tenancy requires Access policy or explicit owner authorization');
   }
+  if (tenancy?.onboarding) {
+    const { schoolPool, sitesPool } = tenancy.onboarding;
+    const pools = [identity?.iamPool, identity?.accessPool, identity?.peoplePool, tenancy.pool, schoolPool, sitesPool];
+    if (!identity || pools.some(pool => typeof pool?.connect !== 'function') || new Set(pools).size !== pools.length) {
+      throw new TypeError('Onboarding requires separate School, Sites, Tenancy and identity pools');
+    }
+  }
   const tenancyOptions = tenancy ? createTenancyGatewayOptions({
     ...tenancy,
     authorize: tenancy.authorize ?? (({ identity: principal, tenantId, action }) =>
       identityOptions.authorizeTenancy(principal, { tenantId, action, orgUnitId: null })),
+    onboarding: tenancy.onboarding && {
+      ...tenancy.onboarding,
+      inviteManager: input => identityOptions.inviteManager(input),
+    },
   }) : {};
   const identityOptions = identity ? createIdentityGatewayOptions({
     ...identity, tenantActive: tenancyOptions.isActive,
+    verifyOrgUnit: tenancyOptions.verifyOrgUnit ?? identity.verifyOrgUnit,
+    scopedInvitations: Boolean(tenancy),
   }) : {};
   const monitor = monitoring && createGatewayMonitor({ mode: monitoring.mode, emit });
   const ready = monitoring?.apiPort ? createApiReadinessProbe(monitoring.apiPort) : gatewayOptions.ready;

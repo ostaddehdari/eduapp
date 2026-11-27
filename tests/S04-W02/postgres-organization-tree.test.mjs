@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import pg from 'pg';
-import { applyOrganizationTree, applyTenantIsolation, runSqlBootstrap } from '../../packages/data/src/migrate.mjs';
+import {
+  applyAccessInvitations, applyAccessPolicy, applyOrganizationTree, applyScopedOrgManagement,
+  applyTenantIsolation, applyTenantRegistry, runSqlBootstrap,
+} from '../../packages/data/src/migrate.mjs';
 import { createTenantTransactions } from '../../packages/data/src/tenant-transactions.mjs';
 import { createOrganizationTree } from '../../apps/tenant-org-service/src/tree.mjs';
 
@@ -48,6 +51,9 @@ test('organization tree transactionally isolates schools and rejects invalid con
   let legacyId;
   try {
     await applyTenantIsolation(migrator);
+    await applyAccessInvitations(migrator);
+    await applyAccessPolicy(migrator);
+    await applyTenantRegistry(migrator);
     for (const identity of [a, b]) {
       await admin.query("INSERT INTO tenancy_organization.tenants (id,slug,status) VALUES ($1,$2,'active')",
         [identity.tenantId, identity.tenantId]);
@@ -58,6 +64,7 @@ test('organization tree transactionally isolates schools and rejects invalid con
     `, [a.tenantId]);
     legacyId = legacy.rows[0].id;
     await applyOrganizationTree(migrator);
+    await applyScopedOrgManagement(migrator);
     assert.equal(await applyOrganizationTree(migrator), false);
   } finally {
     await migrator.end();
