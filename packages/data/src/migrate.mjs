@@ -88,6 +88,10 @@ export function applyIamMfa(client) {
   return applyMigration(client, '0005-iam-mfa', '0002-iam-sessions');
 }
 
+export function applySecurityAudit(client) {
+  return applyMigration(client, '0006-security-audit', foundationVersion);
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const mode = process.argv[2];
   const connectionString = process.env.EDUAPP_DATABASE_URL;
@@ -111,6 +115,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
             await applyAccessInvitations(client);
             await applyAccessPolicy(client);
             await applyIamMfa(client);
+            await applySecurityAudit(client);
             console.log('Identity migrations verified');
           }
         }

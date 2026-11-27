@@ -19,7 +19,7 @@ export function createAuthRoutes({ auth, GatewayError }) {
   return [
     {
       id: 'login', budget: publicBudget,
-      handle: handle(async ({ body }) => ({ data: await auth.login(body ?? {}) })),
+      handle: handle(async ({ body, requestId }) => ({ data: await auth.login(body ?? {}, { requestId }) })),
     },
     {
       id: 'requestOtp', budget: publicBudget,
@@ -27,7 +27,7 @@ export function createAuthRoutes({ auth, GatewayError }) {
     },
     {
       id: 'verifyOtp', budget: publicBudget,
-      handle: handle(async ({ body }) => ({ data: await auth.verifyOtp(body ?? {}) })),
+      handle: handle(async ({ body, requestId }) => ({ data: await auth.verifyOtp(body ?? {}, { requestId }) })),
     },
     {
       id: 'refreshSession', budget: publicBudget, forwardAuthorization: true,

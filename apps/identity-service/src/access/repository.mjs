@@ -5,7 +5,7 @@ const roleRecord = (row) => ({
   roleId: row.id, name: row.name, version: row.version, rules: row.rules, builtin: row.builtin,
 });
 
-export function createPostgresAccessRepository({ transactions }) {
+export function createPostgresAccessRepository({ transactions, appendSecurityEvent }) {
   return Object.freeze({
     readBindings({ tenantId, membershipId, identityId }) {
       return transactions.run(tenantId, async db => {
@@ -21,7 +21,7 @@ export function createPostgresAccessRepository({ transactions }) {
       });
     },
 
-    listRoles({ tenantId, position, limit }) {
+    listRoles({ tenantId, position, limit, principal, requestId }) {
       return transactions.run(tenantId, async db => {
         const { rows } = await db.query(`
           SELECT ${roleColumns} FROM identity_access.roles
@@ -29,6 +29,7 @@ export function createPostgresAccessRepository({ transactions }) {
           ORDER BY id LIMIT $3
         `, [tenantId, position, limit + 1]);
         const data = rows.slice(0, limit).map(roleRecord);
+        await appendSecurityEvent?.(db, { event: 'security.sensitive_access.v1', principal, requestId });
         return { data, nextPosition: rows.length > limit ? data.at(-1).roleId : null };
       });
     },
@@ -42,13 +43,14 @@ export function createPostgresAccessRepository({ transactions }) {
       });
     },
 
-    async createRole({ tenantId, name, rules }) {
+    async createRole({ tenantId, name, rules, principal, requestId }) {
       try {
         return await transactions.run(tenantId, async db => {
           const { rows: [row] } = await db.query(`
             INSERT INTO identity_access.roles (tenant_id, name, version, rules)
             VALUES ($1, $2, 1, $3::jsonb) RETURNING ${roleColumns}
           `, [tenantId, name, JSON.stringify(rules)]);
+          await appendSecurityEvent?.(db, { event: 'security.role_created.v1', principal, requestId, resourceId: row.id });
           return roleRecord(row);
         });
       } catch (error) {
@@ -57,7 +59,7 @@ export function createPostgresAccessRepository({ transactions }) {
       }
     },
 
-    async updateRole({ tenantId, roleId, version, name, rules }) {
+    async updateRole({ tenantId, roleId, version, name, rules, principal, requestId }) {
       try {
         return await transactions.run(tenantId, async db => {
           const { rows: [current] } = await db.query(`
@@ -70,6 +72,7 @@ export function createPostgresAccessRepository({ transactions }) {
             UPDATE identity_access.roles SET name = $3, rules = $4::jsonb, version = version + 1
             WHERE tenant_id = $1 AND id = $2 RETURNING ${roleColumns}
           `, [tenantId, roleId, name, JSON.stringify(rules)]);
+          await appendSecurityEvent?.(db, { event: 'security.role_updated.v1', principal, requestId, resourceId: roleId });
           return { status: 'updated', role: roleRecord(updated) };
         });
       } catch (error) {
@@ -78,7 +81,7 @@ export function createPostgresAccessRepository({ transactions }) {
       }
     },
 
-    assignRole({ tenantId, roleId, version, membershipId, orgUnitId, expiresAt }) {
+    assignRole({ tenantId, roleId, version, membershipId, orgUnitId, expiresAt, principal, requestId }) {
       return transactions.run(tenantId, async db => {
         const member = await db.query(`
           SELECT 1 FROM identity_access.memberships
@@ -108,6 +111,9 @@ export function createPostgresAccessRepository({ transactions }) {
             RETURNING id
           `, values);
           row = inserted.rows[0];
+          if (row) {
+            await appendSecurityEvent?.(db, { event: 'security.role_assigned.v1', principal, requestId, resourceId: row.id });
+          }
         }
         return row ? { roleBindingId: row.id, membershipId, roleId, orgUnitId, expiresAt } : null;
       });

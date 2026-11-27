@@ -107,6 +107,10 @@ jobs:
         env:
           EDUAPP_MFA_PG_ADMIN_URL: postgres://eduapp_ci:eduapp_ci_only@127.0.0.1:55432/eduapp_s03_mfa_test
         run: node --test --test-concurrency=1 tests/S03-W04/*.test.mjs
+      - name: Test scoped security audit and redaction
+        env:
+          EDUAPP_S03_AUDIT_PG_ADMIN_URL: postgres://eduapp_ci:eduapp_ci_only@127.0.0.1:55432/eduapp_s03_audit_test
+        run: node --test --test-concurrency=1 tests/S03-W05/*.test.mjs
 
   runtime:
     name: ci / ${{ matrix.runtime }}

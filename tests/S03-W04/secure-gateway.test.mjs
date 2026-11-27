@@ -6,11 +6,11 @@ import pg from 'pg';
 import { createGatewayRuntime } from '../../apps/api-gateway/src/runtime.mjs';
 import { hashPassword } from '../../apps/identity-service/src/auth/crypto.mjs';
 import {
-  applyAccessInvitations, applyAccessPolicy, applyIamMfa, applyIamSessions, applyTenantIsolation, runSqlBootstrap,
+  applyAccessInvitations, applyAccessPolicy, applyIamMfa, applyIamSessions, applySecurityAudit, applyTenantIsolation, runSqlBootstrap,
 } from '../../packages/data/src/migrate.mjs';
 
 const testDatabase = 'eduapp_s03_secure_gateway_test';
-const migrations = [applyTenantIsolation, applyIamSessions, applyAccessInvitations, applyAccessPolicy, applyIamMfa];
+const migrations = [applyTenantIsolation, applyIamSessions, applyAccessInvitations, applyAccessPolicy, applyIamMfa, applySecurityAudit];
 
 function fixtureCode(secret, instant) {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -83,6 +83,7 @@ test('role and membership writes require live permission and recent MFA in the c
   const rules = [
     { action: 'access.role.read', effect: 'allow' },
     { action: 'access.role.write', effect: 'allow' },
+    { action: 'access.role.assign', effect: 'allow' },
     { action: 'access.membership.create', effect: 'allow' },
     { action: 'people.user.read', effect: 'allow', fields: ['id', 'displayName'] },
   ];
@@ -105,9 +106,9 @@ test('role and membership writes require live permission and recent MFA in the c
   await once(gateway, 'listening');
   t.after(() => new Promise(resolve => gateway.close(resolve)));
   const base = 'http://127.0.0.1:' + gateway.address().port + '/v1';
-  const post = (path, body, token) => fetch(base + path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
+  const send = (path, body, token, { method = 'POST', headers } = {}) => fetch(base + path, {
+    method,
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}), ...headers },
     body: JSON.stringify(body),
   });
   async function data(response, expectedCode = 200) {
@@ -115,7 +116,9 @@ test('role and membership writes require live permission and recent MFA in the c
     return (await response.json()).data;
   }
   const [first, second] = schools;
-  const session = await data(await post('/auth/login', { login, password, tenantId: first.tenantId, membershipId: first.membershipId }));
+  const post = send;
+  const signIn = await post('/auth/login', { login, password, tenantId: first.tenantId, membershipId: first.membershipId });
+  const session = await data(signIn);
   const role = { name: 'Readers', rules: [{ action: 'people.user.read', effect: 'allow', fields: ['id'] }] };
   assert.equal((await post('/roles', role, session.accessToken)).status, 403);
   assert.equal((await post('/memberships', { identityId: actor }, session.accessToken)).status, 403);
@@ -126,14 +129,57 @@ test('role and membership writes require live permission and recent MFA in the c
   }, session.accessToken));
   now += 30_000;
   await data(await post('/auth/mfa/step-up', { code: fixtureCode(enrollment.secret, now) }, session.accessToken));
-  await data(await post('/roles', role, session.accessToken), 201);
+  const roleCreation = await post('/roles', role, session.accessToken);
+  const created = await data(roleCreation, 201);
+  const roleUpdate = await send('/roles/' + created.roleId, { ...role, name: 'Updated readers' }, session.accessToken,
+    { method: 'PATCH', headers: { 'If-Match': '"1"' } });
+  await data(roleUpdate);
   const membership = await data(await post('/memberships', { identityId: actor }, session.accessToken), 201);
   assert.equal(membership.membershipId, first.membershipId);
-  assert.equal((await post('/role-assignments', { roleId: first.roleId, membershipId: first.membershipId }, session.accessToken)).status, 403);
+  const member = randomUUID();
+  await admin.query('INSERT INTO identity_access.identities (id,login_normalized,status) VALUES ($1,$2,$3)',
+    [member, member + '@test.invalid', 'active']);
+  const delegation = await post('/memberships', { identityId: member }, session.accessToken);
+  const delegated = await data(delegation, 201);
+  const bindingResponse = await post('/role-assignments', { roleId: created.roleId, membershipId: delegated.membershipId }, session.accessToken);
+  const binding = await data(bindingResponse, 201);
+  assert.equal((await post('/role-assignments', { roleId: first.roleId, membershipId: first.membershipId }, session.accessToken)).status, 404);
 
   const moved = await data(await post('/auth/refresh', { tenantId: second.tenantId, membershipId: second.membershipId }, session.refreshToken));
   assert.equal(moved.tenantId, second.tenantId);
   assert.equal((await post('/roles', role, session.accessToken)).status, 401);
   assert.equal((await post('/roles', role, moved.accessToken)).status, 403);
   assert.equal((await post('/memberships', { identityId: actor }, moved.accessToken)).status, 403);
+
+  const requestId = response => response.headers.get('x-request-id');
+  const { rows } = await admin.query(`
+    SELECT actor_id, tenant_id, membership_id, request_id, action, outcome, resource_ref
+    FROM platform_audit_jobs.audit_events WHERE actor_id = $1
+  `, [actor]);
+  const expected = [
+    [roleCreation, 'security.role_created.v1', created.roleId],
+    [roleUpdate, 'security.role_updated.v1', created.roleId],
+    [delegation, 'security.membership_delegated.v1', delegated.membershipId],
+    [bindingResponse, 'security.role_assigned.v1', binding.roleBindingId],
+  ];
+  assert.equal(rows.length, expected.length);
+  for (const [response, action, resource] of expected) {
+    assert.deepEqual(rows.find(row => row.request_id === requestId(response)), {
+      actor_id: actor, tenant_id: first.tenantId, membership_id: first.membershipId, request_id: requestId(response),
+      action, outcome: 'success', resource_ref: resource,
+    });
+  }
+  const facts = await admin.query(`
+    SELECT to_jsonb(fact) AS data FROM identity_access.security_login_facts AS fact
+    WHERE request_id = $1
+  `, [requestId(signIn)]);
+  assert.equal(facts.rowCount, 1);
+  assert.equal(facts.rows[0].data.actor_id, actor);
+  assert.equal(facts.rows[0].data.tenant_id, first.tenantId);
+  assert.equal(facts.rows[0].data.membership_id, first.membershipId);
+  assert.equal(facts.rows[0].data.outcome, 'success');
+  const persisted = JSON.stringify([rows, facts.rows]);
+  for (const secret of [login, password, enrollment.secret, session.accessToken, session.refreshToken, 'Updated readers']) {
+    assert.equal(persisted.includes(secret), false);
+  }
 });
