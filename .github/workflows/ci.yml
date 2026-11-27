@@ -111,6 +111,8 @@ jobs:
         env:
           EDUAPP_S03_AUDIT_PG_ADMIN_URL: postgres://eduapp_ci:eduapp_ci_only@127.0.0.1:55432/eduapp_s03_audit_test
         run: node --test --test-concurrency=1 tests/S03-W05/*.test.mjs
+      - name: Validate the S03 evidence gate
+        run: node scripts/validate-stage-gate-s03.mjs
 
   runtime:
     name: ci / ${{ matrix.runtime }}
