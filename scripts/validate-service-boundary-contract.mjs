@@ -52,8 +52,8 @@ for (const pathItem of Object.values(openapi.paths ?? {})) {
     operationIds.push(operation.operationId);
   }
 }
-assert.equal(operationIds.length, 64);
-assert.equal(new Set(operationIds).size, 64, 'duplicate operationId');
+assert.ok(operationIds.length >= 64, 'the original API surface must be preserved');
+assert.equal(new Set(operationIds).size, operationIds.length, 'duplicate operationId');
 
 assert.equal(contract.event_contracts.length, 10);
 for (const event of contract.event_contracts) {

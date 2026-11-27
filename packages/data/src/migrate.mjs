@@ -80,6 +80,14 @@ export function applyAccessInvitations(client) {
   return applyMigration(client, '0003-access-invitations', foundationVersion);
 }
 
+export function applyAccessPolicy(client) {
+  return applyMigration(client, '0004-access-policy', foundationVersion);
+}
+
+export function applyIamMfa(client) {
+  return applyMigration(client, '0005-iam-mfa', '0002-iam-sessions');
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const mode = process.argv[2];
   const connectionString = process.env.EDUAPP_DATABASE_URL;
@@ -101,6 +109,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
           if (mode === 'apply-identity') {
             await applyIamSessions(client);
             await applyAccessInvitations(client);
+            await applyAccessPolicy(client);
+            await applyIamMfa(client);
             console.log('Identity migrations verified');
           }
         }

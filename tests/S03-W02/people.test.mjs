@@ -111,10 +111,16 @@ test('two schools independently invite and resolve the same identity through Pos
   const actions = [];
   const serviceOptions = {
     access, people, findActiveIdentity, deliverInvitation: delivery,
+    requireRecentMfa: async () => true,
     verifyOrgUnit: async ({ tenantId, orgUnitId }) => (tenantId === tenantA && orgUnitId === schoolA) || (tenantId === tenantB && orgUnitId === schoolB),
     authorize: async scope => { actions.push(scope.action); return scope.actor === inviter; },
   };
   const service = createPeopleService(serviceOptions);
+  const withoutMfa = createPeopleService({ ...serviceOptions, requireRecentMfa: undefined });
+  for (const method of ['createMembership', 'createInvitation']) {
+    await assert.rejects(withoutMfa[method]({ identity: activeInviter[0], body: { identityId: invitee, orgUnitId: schoolA } }),
+      { message: 'FORBIDDEN' });
+  }
   const create = (identity, orgUnitId) => service.createInvitation({ identity, body: { identityId: invitee, orgUnitId } });
   await assert.rejects(create(activeInviter[0], schoolB), { message: 'NOT_FOUND' });
   await assert.rejects(service.createInvitation({ identity: activeInviter[0], body: { identityId: invitee, tenantId: tenantB } }), { message: 'VALIDATION_FAILED' });
