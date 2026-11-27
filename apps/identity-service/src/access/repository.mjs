@@ -5,19 +5,32 @@ const roleRecord = (row) => ({
   roleId: row.id, name: row.name, version: row.version, rules: row.rules, builtin: row.builtin,
 });
 
-export function createPostgresAccessRepository({ transactions, appendSecurityEvent }) {
+export function createPostgresAccessRepository({ transactions, appendSecurityEvent, registryOwnerInvitations }) {
+  const ownerJoin = registryOwnerInvitations ? `
+    LEFT JOIN identity_access.registry_owner_receipts AS receipt
+      ON receipt.tenant_id = m.tenant_id AND receipt.membership_id = m.id
+  ` : '';
+  const ownerColumn = registryOwnerInvitations
+    ? "(receipt.membership_id IS NOT NULL AND r.builtin AND r.name = 'Tenant owner' AND b.scope_org_id IS NULL)"
+    : 'false';
   return Object.freeze({
     readBindings({ tenantId, membershipId, identityId }) {
       return transactions.run(tenantId, async db => {
         const { rows } = await db.query(`
-          SELECT b.scope_org_id, r.rules FROM identity_access.memberships AS m
+          SELECT b.scope_org_id, r.rules, ${ownerColumn} AS bootstrap_owner FROM identity_access.memberships AS m
           JOIN identity_access.role_bindings AS b ON b.tenant_id = m.tenant_id AND b.membership_id = m.id
           JOIN identity_access.roles AS r ON r.tenant_id = b.tenant_id AND r.id = b.role_id
+          ${ownerJoin}
           WHERE m.tenant_id = $1 AND m.id = $2 AND m.identity_id = $3 AND m.status = 'active'
             AND (m.expires_at IS NULL OR m.expires_at > statement_timestamp())
             AND (b.expires_at IS NULL OR b.expires_at > statement_timestamp())
         `, [tenantId, membershipId, identityId]);
-        return rows.map(row => ({ orgUnitId: row.scope_org_id, rules: row.rules }));
+        return rows.map(row => ({
+          orgUnitId: row.scope_org_id,
+          rules: row.bootstrap_owner
+            ? [...row.rules, { action: 'access.invitation.create', effect: 'allow' }]
+            : row.rules,
+        }));
       });
     },
 

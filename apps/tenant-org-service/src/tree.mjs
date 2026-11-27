@@ -139,6 +139,18 @@ export function createOrganizationTree({ transactions, authorize }) {
   }
 
   return Object.freeze({
+    async verifyOrgUnit({ tenantId, orgUnitId }) {
+      if (!isUuid(tenantId) || !isUuid(orgUnitId)) return false;
+      return transactions.run(tenantId, async db => {
+        const result = await db.query(`
+          SELECT 1 FROM tenancy_organization.org_units o
+          JOIN tenancy_organization.tenants t ON t.id = o.tenant_id
+          WHERE o.tenant_id = $1 AND o.id = $2 AND t.status = 'active' AND t.deleted_at IS NULL
+        `, [tenantId, orgUnitId]);
+        return result.rowCount === 1;
+      });
+    },
+
     async list({ identity, page }) {
       const { tenantId } = await authorized(identity, 'tenancy.org.read');
       if (!Number.isInteger(page?.limit) || page.limit < 1 || page.limit > 100) fail('INVALID_REQUEST');
@@ -187,9 +199,9 @@ export function createOrganizationTree({ transactions, authorize }) {
       });
     },
 
-    async move({ identity, orgUnitId, ifMatch, body }) {
-      const { tenantId } = await authorized(identity, 'tenancy.org.write');
-      if (!isUuid(orgUnitId)) fail('VALIDATION_FAILED');
+    async move({ identity, orgUnitId, ifMatch, body, requestId = randomUUID() }) {
+      const { actor, tenantId } = await authorized(identity, 'tenancy.org.write');
+      if (!isUuid(orgUnitId) || !isUuid(requestId)) fail('VALIDATION_FAILED');
       const id = orgUnitId.toLowerCase();
       const expectedVersion = parseVersion(ifMatch);
       allowFields(body, ['parentId']);
@@ -210,6 +222,11 @@ export function createOrganizationTree({ transactions, authorize }) {
         `, [tenantId, id, parentId, expectedVersion]);
         if (!updated) fail('PRECONDITION_FAILED');
         const item = record(updated);
+        await db.query(`
+          INSERT INTO tenancy_organization.org_unit_move_history
+            (tenant_id, org_unit_id, prior_version, version, prior_parent_id, parent_id, actor_id, request_id)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+        `, [tenantId, id, current.version, item.version, current.parent_id, parentId, actor, requestId]);
         await appendChange(db, item);
         return item;
       });

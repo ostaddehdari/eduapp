@@ -118,6 +118,17 @@ jobs:
           EDUAPP_S04_REGISTRY_PG_ADMIN_URL: postgres://eduapp_ci:eduapp_ci_only@127.0.0.1:55432/eduapp_s04_registry_test
           EDUAPP_S04_ORG_PG_ADMIN_URL: postgres://eduapp_ci:eduapp_ci_only@127.0.0.1:55432/eduapp_s04_org_test
         run: node --test --test-concurrency=1 tests/S04-W0[12]/*.test.mjs
+      - name: Test resumable onboarding and scoped management
+        env:
+          EDUAPP_S04_REGISTRY_PG_ADMIN_URL: postgres://eduapp_ci:eduapp_ci_only@127.0.0.1:55432/eduapp_s04_registry_test
+          EDUAPP_S04_SCOPE_PG_ADMIN_URL: postgres://eduapp_ci:eduapp_ci_only@127.0.0.1:55432/eduapp_s04_scope_test
+        run: node --test --test-concurrency=1 tests/S04-W03/gateway-onboarding.test.mjs tests/S04-W04/*.test.mjs
+      - name: Test the Persian setup wizard and verify the published preview bundle
+        run: |
+          node --test tests/S04-W03/browser.test.mjs
+          env -u VITE_EDUAPP_API_BASE corepack pnpm --filter @eduapp/control-panel exec vite build --base=./ --outDir ../../preview/panel --emptyOutDir
+          cp packages/ui-tokens/node_modules/@fontsource-variable/vazirmatn/LICENSE preview/panel/Vazirmatn-LICENSE.txt
+          test -z "$(git status --porcelain --untracked-files=all -- preview/panel)"
 
   runtime:
     name: ci / ${{ matrix.runtime }}

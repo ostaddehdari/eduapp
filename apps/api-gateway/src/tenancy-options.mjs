@@ -1,12 +1,14 @@
 import { createTenantTransactions } from '../../../packages/data/src/tenant-transactions.mjs';
 import { createTenantRegistry, createTenantRegistryRoutes } from '../../tenant-org-service/src/registry.mjs';
 import { createOrganizationTree, OrganizationError } from '../../tenant-org-service/src/tree.mjs';
+import { createOnboarding, OnboardingError } from '../../tenant-org-service/src/onboarding.mjs';
+import { PeopleError } from '../../identity-service/src/people/people-service.mjs';
 import { GatewayError } from './gateway.mjs';
 
 const budget = Object.freeze({ max: 30, windowSeconds: 60 });
 
 export function createTenancyGatewayOptions({
-  pool, authorize, authorizeProvisioning, authorizeStatusChange, now,
+  pool, authorize, authorizeProvisioning, authorizeStatusChange, onboarding, now,
 }) {
   if (typeof pool?.connect !== 'function' || typeof authorize !== 'function') {
     throw new TypeError('Tenancy requires an owner pool and authorization policy');
@@ -17,6 +19,11 @@ export function createTenancyGatewayOptions({
     authorizeTenant: ({ identity, tenantId }) => authorize({ identity, tenantId, action: 'tenancy.tenant.read' }),
   });
   const tree = createOrganizationTree({ transactions, authorize });
+  const wizard = onboarding && createOnboarding({
+    transactions, tree, authorize, inviteManager: onboarding.inviteManager,
+    schoolTransactions: createTenantTransactions(onboarding.schoolPool),
+    sitesTransactions: createTenantTransactions(onboarding.sitesPool),
+  });
 
   function organizationRoute(id, handle) {
     return {
@@ -26,7 +33,9 @@ export function createTenancyGatewayOptions({
         try {
           return await handle(input);
         } catch (error) {
-          if (error instanceof OrganizationError) throw new GatewayError(error.message);
+          if (error instanceof OrganizationError || error instanceof OnboardingError || error instanceof PeopleError) {
+            throw new GatewayError(error.message);
+          }
           throw error;
         }
       },
@@ -35,6 +44,7 @@ export function createTenancyGatewayOptions({
   const list = ({ identity, page }) => tree.list({ identity, page });
   return {
     isActive: registry.isActive,
+    verifyOrgUnit: tree.verifyOrgUnit,
     routes: [
       ...createTenantRegistryRoutes({ registry, GatewayError }),
       organizationRoute('listOrgUnits', list),
@@ -47,6 +57,10 @@ export function createTenancyGatewayOptions({
         const data = await tree.move({ identity, orgUnitId: params.orgUnitId, body, ifMatch, requestId });
         return { data, etag: '"' + data.version + '"' };
       }),
+      ...(wizard ? [
+        organizationRoute('readOnboarding', async input => ({ data: await wizard.read(input) })),
+        organizationRoute('advanceOnboarding', async input => ({ data: await wizard.advance(input) })),
+      ] : []),
     ],
   };
 }

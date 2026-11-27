@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 
 const uuidPattern = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const invitePattern = /^[A-Za-z0-9_-]{43}$/;
@@ -16,8 +16,12 @@ function expectFields(body, fields) {
 }
 
 function identityFromPrincipal(principal) {
-  if (!isUuid(principal?.identityId) || !isUuid(principal?.sessionId)) fail('AUTHENTICATION_REQUIRED');
+  if (!hasInvitationPrincipal(principal)) fail('AUTHENTICATION_REQUIRED');
   return principal.identityId.toLowerCase();
+}
+
+export function hasInvitationPrincipal(principal) {
+  return isUuid(principal?.identityId) && isUuid(principal?.sessionId);
 }
 
 export function hasPeopleScope(identity) {
@@ -27,11 +31,15 @@ export function hasPeopleScope(identity) {
 
 export function createPeopleService({
   people, access, authorize, findActiveIdentity, verifyOrgUnit, deliverInvitation, requireRecentMfa,
-  projectProfile, recordSecurityEvent,
+  projectProfile, recordSecurityEvent, invitationKey,
 }) {
   if (typeof authorize !== 'function' || typeof findActiveIdentity !== 'function') {
     throw new TypeError('People requires owned authorization and identity resolution');
   }
+  if (invitationKey !== undefined && (!Buffer.isBuffer(invitationKey) || invitationKey.length < 32)) {
+    throw new TypeError('Scoped invitations require an invitation key of at least 32 bytes');
+  }
+  const scopedKey = invitationKey && Buffer.from(invitationKey);
 
   async function activeIdentity(identityId) {
     return (await findActiveIdentity({ identityId }))?.id === identityId;
@@ -52,8 +60,8 @@ export function createPeopleService({
     return scope;
   }
 
-  async function membershipTarget(identity, body, action) {
-    expectFields(body, ['identityId', 'orgUnitId']);
+  async function membershipTarget(identity, body, action, fields = ['identityId', 'orgUnitId']) {
+    expectFields(body, fields);
     const identityId = uuid(body.identityId);
     const orgUnitId = body.orgUnitId == null ? null : uuid(body.orgUnitId);
     const scope = await authorizedScope(identity, action, orgUnitId);
@@ -109,20 +117,40 @@ export function createPeopleService({
       if (!result) fail('CONFLICT');
       return result;
     },
-    async createInvitation({ identity, body, requestId }) {
-      const { scope, target } = await membershipTarget(identity, body, 'access.invitation.create');
+    async createInvitation({ identity, body, requestId, requestKey }) {
+      const fields = scopedKey ? ['identityId', 'orgUnitId', 'expiresInHours'] : ['identityId', 'orgUnitId'];
+      const { scope, target } = await membershipTarget(identity, body, 'access.invitation.create', fields);
       if (typeof deliverInvitation !== 'function') fail('SERVICE_UNAVAILABLE');
-      const token = randomBytes(32).toString('base64url');
+      const expiresInHours = Object.hasOwn(body, 'expiresInHours') ? body.expiresInHours : 48;
+      if (!Number.isInteger(expiresInHours) || expiresInHours < 1 || expiresInHours > 168 ||
+          (requestKey !== undefined && !scopedKey)) fail('VALIDATION_FAILED');
+      const commandKey = scopedKey ? uuid(requestKey ?? randomUUID()) : null;
+      const token = commandKey ? createHmac('sha256', scopedKey).update(JSON.stringify([
+        'eduapp.scoped-invitation.v1', scope.tenantId, scope.membershipId, commandKey,
+        target.identityId, target.orgUnitId, expiresInHours,
+      ])).digest('base64url') : randomBytes(32).toString('base64url');
       const invite = await access.issueInvitation({
         ...target, invitedByMembershipId: scope.membershipId, tokenHash: hash(token),
+        ...(scopedKey ? { requestKey: commandKey, expiresInHours } : {}),
       }, { principal: scope, requestId });
+      if (invite.outcome === 'missing') fail('NOT_FOUND');
+      if (invite.outcome === 'conflict') fail('IDEMPOTENCY_CONFLICT');
+      const result = { invitationId: invite.invitationId, expiresAt: invite.expiresAt, status: 'queued' };
+      if (invite.outcome === 'delivered') return result;
       try {
-        if (await deliverInvitation({ ...invite, ...target, token }) !== true) fail('SERVICE_UNAVAILABLE');
+        if (await deliverInvitation({ invitationId: invite.invitationId, expiresAt: invite.expiresAt, ...target, token }) !== true) {
+          fail('SERVICE_UNAVAILABLE');
+        }
+        if (scopedKey && await access.markInvitationDelivered({ tenantId: scope.tenantId, invitationId: invite.invitationId }) !== true) {
+          fail('SERVICE_UNAVAILABLE');
+        }
       } catch {
-        await access.revokeUndeliveredInvitation({ tenantId: scope.tenantId, invitationId: invite.invitationId });
+        if (!scopedKey || requestKey === undefined) {
+          await access.revokeUndeliveredInvitation({ tenantId: scope.tenantId, invitationId: invite.invitationId });
+        }
         fail('SERVICE_UNAVAILABLE');
       }
-      return { ...invite, status: 'queued' };
+      return result;
     },
     async acceptInvitation({ principal, tenantId: targetTenant, token }) {
       const identityId = identityFromPrincipal(principal);
