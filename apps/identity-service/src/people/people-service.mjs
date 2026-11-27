@@ -26,7 +26,8 @@ export function hasPeopleScope(identity) {
 }
 
 export function createPeopleService({
-  people, access, authorize, findActiveIdentity, verifyOrgUnit, deliverInvitation, requireRecentMfa, projectProfile,
+  people, access, authorize, findActiveIdentity, verifyOrgUnit, deliverInvitation, requireRecentMfa,
+  projectProfile, recordSecurityEvent,
 }) {
   if (typeof authorize !== 'function' || typeof findActiveIdentity !== 'function') {
     throw new TypeError('People requires owned authorization and identity resolution');
@@ -69,18 +70,23 @@ export function createPeopleService({
   }
 
   return Object.freeze({
-    async listUsers({ identity, page }) {
+    async listUsers({ identity, page, requestId }) {
       const scope = await authorizedScope(identity, 'people.user.read', null);
       if (!Number.isInteger(page?.limit) || page.limit < 1 || page.limit > 100) fail('VALIDATION_FAILED');
       const position = page.position == null ? null : uuid(page.position);
       const result = await people.list({ tenantId: scope.tenantId, position, limit: page.limit });
-      return { ...result, data: await project(scope, result.data) };
+      const data = await project(scope, result.data);
+      await recordSecurityEvent?.({ event: 'security.sensitive_access.v1', principal: scope, requestId });
+      return { ...result, data };
     },
-    async getUser({ identity, profileId }) {
+    async getUser({ identity, profileId, requestId }) {
       const scope = await authorizedScope(identity, 'people.user.read', null);
-      const found = await people.get({ tenantId: scope.tenantId, profileId: uuid(profileId) });
+      const resourceId = uuid(profileId);
+      const found = await people.get({ tenantId: scope.tenantId, profileId: resourceId });
       if (!found) fail('NOT_FOUND');
-      return project(scope, found);
+      const profile = await project(scope, found);
+      await recordSecurityEvent?.({ event: 'security.sensitive_access.v1', principal: scope, resourceId, requestId });
+      return profile;
     },
     async createUser({ identity, body }) {
       const { tenantId } = await authorizedScope(identity, 'people.user.write', null);
@@ -97,17 +103,19 @@ export function createPeopleService({
       if (!profile) fail('CONFLICT');
       return profile;
     },
-    async createMembership({ identity, body }) {
-      const { target } = await membershipTarget(identity, body, 'access.membership.create');
-      const result = await access.addMembership(target);
+    async createMembership({ identity, body, requestId }) {
+      const { scope, target } = await membershipTarget(identity, body, 'access.membership.create');
+      const result = await access.addMembership(target, { principal: scope, requestId });
       if (!result) fail('CONFLICT');
       return result;
     },
-    async createInvitation({ identity, body }) {
+    async createInvitation({ identity, body, requestId }) {
       const { scope, target } = await membershipTarget(identity, body, 'access.invitation.create');
       if (typeof deliverInvitation !== 'function') fail('SERVICE_UNAVAILABLE');
       const token = randomBytes(32).toString('base64url');
-      const invite = await access.issueInvitation({ ...target, invitedByMembershipId: scope.membershipId, tokenHash: hash(token) });
+      const invite = await access.issueInvitation({
+        ...target, invitedByMembershipId: scope.membershipId, tokenHash: hash(token),
+      }, { principal: scope, requestId });
       try {
         if (await deliverInvitation({ ...invite, ...target, token }) !== true) fail('SERVICE_UNAVAILABLE');
       } catch {

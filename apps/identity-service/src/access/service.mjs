@@ -102,28 +102,28 @@ export function createAccessService({
       return { ...scope, capabilities: result };
     },
 
-    async listRoles(identity, page) {
+    async listRoles(identity, page, requestId) {
       const context = await tenantAdmin(identity, 'access.role.read');
       if (!Number.isInteger(page?.limit) || page.limit < 1 || page.limit > 100) fail('VALIDATION_FAILED');
       const position = page.position === null ? null : requireUuid(page.position);
-      return repository.listRoles({ tenantId: context.tenantId, position, limit: page.limit });
+      return repository.listRoles({ tenantId: context.tenantId, position, limit: page.limit, principal: context, requestId });
     },
 
-    async createRole(identity, body) {
+    async createRole(identity, body, requestId) {
       const context = await tenantAdmin(identity, 'access.role.write');
       const value = validateRole(body);
       ensureDelegable(context, value.rules);
-      const role = await repository.createRole({ tenantId: context.tenantId, ...value });
+      const role = await repository.createRole({ tenantId: context.tenantId, ...value, principal: context, requestId });
       if (!role) fail('CONFLICT');
       return role;
     },
 
-    async updateRole(identity, roleId, ifMatch, body) {
+    async updateRole(identity, roleId, ifMatch, body, requestId) {
       const context = await tenantAdmin(identity, 'access.role.write');
       const value = validateRole(body);
       ensureDelegable(context, value.rules);
       const result = await repository.updateRole({
-        tenantId: context.tenantId, roleId: requireUuid(roleId), version: roleVersion(ifMatch), ...value,
+        tenantId: context.tenantId, roleId: requireUuid(roleId), version: roleVersion(ifMatch), ...value, principal: context, requestId,
       });
       if (result.status !== 'updated') fail({
         missing: 'NOT_FOUND', stale: 'PRECONDITION_FAILED', conflict: 'CONFLICT',
@@ -131,7 +131,7 @@ export function createAccessService({
       return result.role;
     },
 
-    async assignRole(identity, body) {
+    async assignRole(identity, body, requestId) {
       const context = await tenantAdmin(identity, 'access.role.assign');
       requireFields(body, ['roleId', 'membershipId', 'orgUnitId', 'expiresAt']);
       const tenantId = context.tenantId;
@@ -146,7 +146,9 @@ export function createAccessService({
       const role = await repository.getRole({ tenantId, roleId });
       if (!role || role.builtin) fail('NOT_FOUND');
       ensureDelegable(context, normalizeRules(role.rules, { custom: true }));
-      const binding = await repository.assignRole({ tenantId, roleId, version: role.version, membershipId, orgUnitId, expiresAt });
+      const binding = await repository.assignRole({
+        tenantId, roleId, version: role.version, membershipId, orgUnitId, expiresAt, principal: context, requestId,
+      });
       if (!binding) fail('NOT_FOUND');
       return binding;
     },

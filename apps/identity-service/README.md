@@ -15,4 +15,6 @@ node packages/data/src/migrate.mjs apply-identity
 
 Each command reads `EDUAPP_DATABASE_URL` from the service configuration. Grant no migration credentials to the running Gateway. OTP and invitation tests use synthetic destinations and injected delivery fixtures. Provider wiring and operational release are handled under their own deployment tasks.
 
-[Authentication and sessions](../../docs/contracts/S03-W01.md) · [People and memberships](../../docs/contracts/S03-W02.md) · [Access policy](../../docs/contracts/S03-W03.md) · [MFA and recovery](../../docs/contracts/S03-W04.md)
+The composed Gateway records login outcomes, role changes, delegation and sensitive reads through the restricted audit paths installed by `apply-identity`. Login outcomes stay in an IAM-private table. Tenant audit records carry verified scope and a server request ID.
+
+[Authentication and sessions](../../docs/contracts/S03-W01.md) · [People and memberships](../../docs/contracts/S03-W02.md) · [Access policy](../../docs/contracts/S03-W03.md) · [MFA and recovery](../../docs/contracts/S03-W04.md) · [Security audit](../../docs/contracts/S03-W05.md)

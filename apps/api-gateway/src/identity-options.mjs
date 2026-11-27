@@ -1,4 +1,7 @@
 import { createAuthService } from '../../identity-service/src/auth/service.mjs';
+import {
+  appendIamSecurityEvent, appendTenantSecurityEvent, createSecurityAudit,
+} from '../../audit-service/src/service.mjs';
 import { createAuthGatewayOptions } from '../../identity-service/src/auth/routes.mjs';
 import { createPostgresAccessRepository } from '../../identity-service/src/access/repository.mjs';
 import { createAccessService, createAccessAuthorize, createPeopleFieldProjection } from '../../identity-service/src/access/service.mjs';
@@ -29,18 +32,21 @@ export function createIdentityGatewayOptions({
   }
 
   const transactions = createTenantTransactions(accessPool);
-  const access = createAccessRepository({ transactions });
-  const people = createPeopleRepository({ transactions: createTenantTransactions(peoplePool) });
+  const peopleTransactions = createTenantTransactions(peoplePool);
+  const audit = createSecurityAudit({ accessTransactions: transactions, peopleTransactions, iamPool });
+  const access = createAccessRepository({ transactions, appendSecurityEvent: appendTenantSecurityEvent });
+  const people = createPeopleRepository({ transactions: peopleTransactions });
   const resolveMembership = input => access.resolveMembership(input);
   const auth = createAuthService({
     pool: iamPool, resolveMembership, deliverOtp, accessSigningKey, otpPepper, now,
+    audit: { appendIam: appendIamSecurityEvent, recordIam: audit.recordIam },
   });
   const mfa = mfaEncryptionKey === undefined ? null : createMfaService({
     pool: iamPool, encryptionKey: mfaEncryptionKey, otpPepper, now,
   });
   const requireRecentMfa = identity => mfa?.isFresh(identity) ?? false;
   const permissionService = accessPolicy ? createAccessService({
-    repository: createPostgresAccessRepository({ transactions }),
+    repository: createPostgresAccessRepository({ transactions, appendSecurityEvent: appendTenantSecurityEvent }),
     resolveMembership, verifyGuardian: accessPolicy.verifyGuardian,
     hasEntitlement: accessPolicy.hasEntitlement, verifyOrgUnit, requireRecentMfa, now,
   }) : null;
@@ -50,6 +56,7 @@ export function createIdentityGatewayOptions({
     projectProfile: permissionService ? createPeopleFieldProjection(permissionService) : undefined,
     findActiveIdentity: input => auth.findActiveIdentity(input),
     verifyOrgUnit, deliverInvitation, requireRecentMfa,
+    recordSecurityEvent: audit.recordTenant,
   });
   const authOptions = createAuthGatewayOptions(auth, { GatewayError });
   return {

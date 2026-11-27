@@ -7,7 +7,7 @@ function membershipRecord(row) {
   return { membershipId: row.id, tenantId: row.tenant_id, identityId: row.identity_id, orgUnitId: row.org_unit_id };
 }
 
-async function ensureMembership(connection, { tenantId, identityId, orgUnitId }) {
+async function ensureMembership(connection, { tenantId, identityId, orgUnitId }, onCreated) {
   const scope = [tenantId, identityId, orgUnitId];
   await connection.query(
     `UPDATE identity_access.memberships SET status = 'expired'
@@ -20,7 +20,11 @@ async function ensureMembership(connection, { tenantId, identityId, orgUnitId })
      ON CONFLICT (tenant_id, identity_id, org_unit_id) WHERE status = 'active' DO NOTHING
      RETURNING ${membershipColumns}`, scope,
   );
-  if (inserted.rows[0]) return membershipRecord(inserted.rows[0]);
+  if (inserted.rows[0]) {
+    const record = membershipRecord(inserted.rows[0]);
+    await onCreated?.(record);
+    return record;
+  }
   const { rows } = await connection.query(
     `SELECT ${membershipColumns} FROM identity_access.memberships
       WHERE tenant_id = $1 AND identity_id = $2 AND org_unit_id IS NOT DISTINCT FROM $3::uuid AND ${active}
@@ -29,7 +33,7 @@ async function ensureMembership(connection, { tenantId, identityId, orgUnitId })
   return rows[0] ? membershipRecord(rows[0]) : null;
 }
 
-export function createAccessRepository({ transactions }) {
+export function createAccessRepository({ transactions, appendSecurityEvent }) {
   return Object.freeze({
     resolveMembership({ tenantId, identityId, membershipId }) {
       return transactions.run(tenantId, async (connection) => {
@@ -52,10 +56,15 @@ export function createAccessRepository({ transactions }) {
         return result.rowCount === 1;
       });
     },
-    addMembership(scope) {
-      return transactions.run(scope.tenantId, connection => ensureMembership(connection, scope));
+    addMembership(scope, auditContext) {
+      return transactions.run(scope.tenantId, connection => ensureMembership(connection, scope, async ({ membershipId }) => {
+        if (!auditContext) return;
+        await appendSecurityEvent?.(connection, {
+          ...auditContext, event: 'security.membership_delegated.v1', resourceId: membershipId,
+        });
+      }));
     },
-    issueInvitation({ tenantId, identityId, orgUnitId, invitedByMembershipId, tokenHash }) {
+    issueInvitation({ tenantId, identityId, orgUnitId, invitedByMembershipId, tokenHash }, auditContext) {
       return transactions.run(tenantId, async (connection) => {
         const id = randomUUID();
         const { rows } = await connection.query(
@@ -64,6 +73,9 @@ export function createAccessRepository({ transactions }) {
            VALUES ($1, $2, $3, $4, $5, $6) RETURNING expires_at`,
           [tenantId, id, identityId, orgUnitId, invitedByMembershipId, tokenHash],
         );
+        if (auditContext) {
+          await appendSecurityEvent?.(connection, { ...auditContext, event: 'security.invitation_delegated.v1', resourceId: id });
+        }
         return { invitationId: id, expiresAt: rows[0].expires_at.toISOString() };
       });
     },

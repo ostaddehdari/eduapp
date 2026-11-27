@@ -6,7 +6,7 @@ import pg from 'pg';
 import { createGatewayRuntime } from '../../apps/api-gateway/src/runtime.mjs';
 import { hashPassword } from '../../apps/identity-service/src/auth/crypto.mjs';
 import {
-  applyAccessInvitations, applyIamSessions, applyTenantIsolation, runSqlBootstrap,
+  applyAccessInvitations, applyIamSessions, applySecurityAudit, applyTenantIsolation, runSqlBootstrap,
 } from '../../packages/data/src/migrate.mjs';
 
 const database = 'eduapp_s03_identity_gateway_test';
@@ -50,6 +50,7 @@ async function fixture(t) {
     await applyTenantIsolation(migrator);
     await applyIamSessions(migrator);
     await applyAccessInvitations(migrator);
+    await applySecurityAudit(migrator);
   } finally {
     await migrator.end();
   }
@@ -114,7 +115,8 @@ test('the composed Gateway serves only the active membership scope after refresh
     login, password, tenantId: first.tenantId, membershipId: first.membershipId,
   } }));
   assert.equal(session.tenantId, first.tenantId);
-  const firstPage = await data(await send('/users', { token: session.accessToken }));
+  const firstRead = await send('/users', { token: session.accessToken });
+  const firstPage = await data(firstRead);
   assert.deepEqual(firstPage.map(item => item.displayName), [first.label]);
   assert.equal((await send('/users/' + second.profileId, { token: session.accessToken })).status, 404);
   assert.equal((await send('/users', { method: 'POST', token: session.accessToken, body: { displayName: 'Denied' } })).status, 403);
@@ -124,7 +126,22 @@ test('the composed Gateway serves only the active membership scope after refresh
   } }));
   assert.equal(rotated.tenantId, second.tenantId);
   assert.equal((await send('/users', { token: session.accessToken })).status, 401);
-  const secondPage = await data(await send('/users', { token: rotated.accessToken }));
+  const secondRead = await send('/users', { token: rotated.accessToken });
+  const secondPage = await data(secondRead);
   assert.deepEqual(secondPage.map(item => item.displayName), [second.label]);
   assert.equal((await send('/users/' + first.profileId, { token: rotated.accessToken })).status, 404);
+
+  const { rows } = await admin.query(`
+    SELECT request_id, tenant_id, membership_id, actor_id, outcome, resource_ref
+    FROM platform_audit_jobs.audit_events
+    WHERE action = 'security.sensitive_access.v1' AND actor_id = $1
+  `, [identityId]);
+  assert.equal(rows.length, 2);
+  for (const [response, school] of [[firstRead, first], [secondRead, second]]) {
+    const requestId = response.headers.get('x-request-id');
+    assert.deepEqual(rows.find(row => row.request_id === requestId), {
+      request_id: requestId, tenant_id: school.tenantId, membership_id: school.membershipId,
+      actor_id: identityId, outcome: 'success', resource_ref: 'scope',
+    });
+  }
 });

@@ -44,7 +44,9 @@ function validateKey(key) {
   return Buffer.from(key);
 }
 
-export function createAuthService({ pool, resolveMembership, deliverOtp, accessSigningKey, otpPepper, now = Date.now }) {
+export function createAuthService({
+  pool, resolveMembership, deliverOtp, accessSigningKey, otpPepper, audit, now = Date.now,
+}) {
   if (typeof resolveMembership !== 'function' || typeof deliverOtp !== 'function') {
     throw new TypeError('IAM requires membership and OTP delivery ports');
   }
@@ -82,7 +84,7 @@ export function createAuthService({ pool, resolveMembership, deliverOtp, accessS
     };
   }
 
-  async function openSession(db, identityId, scope) {
+  async function openSession(db, identityId, scope, requestId) {
     const instant = now();
     const id = randomUUID();
     const bundle = tokens(id, instant + SESSION_TTL, instant);
@@ -92,7 +94,15 @@ export function createAuthService({ pool, resolveMembership, deliverOtp, accessS
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
     `, [id, identityId, digest(bundle.refreshToken), bundle.refreshExpiresAt, digest(bundle.accessToken),
       bundle.accessExpiresAt, scope.tenantId, scope.membershipId, asDate(instant)]);
+    await audit?.appendIam(db, {
+      event: 'security.login.v1', outcome: 'success', actorId: identityId, sessionId: id,
+      tenantId: scope.tenantId, membershipId: scope.membershipId, requestId,
+    });
     return { sessionId: id, ...bundle, tenantId: scope.tenantId, membershipId: scope.membershipId };
+  }
+
+  async function recordDeniedLogin(requestId, actorId) {
+    await audit?.recordIam({ event: 'security.login.v1', outcome: 'denied', actorId, requestId });
   }
 
   return Object.freeze({
@@ -104,7 +114,7 @@ export function createAuthService({ pool, resolveMembership, deliverOtp, accessS
       return rows[0] ?? null;
     },
 
-    async login(input) {
+    async login(input, { requestId } = {}) {
       const login = loginValue(input.login);
       const selected = readSelection(input);
       if (!isPasswordInput(input.password)) throw invalid();
@@ -112,10 +122,16 @@ export function createAuthService({ pool, resolveMembership, deliverOtp, accessS
       const { rows: [identity] } = await repo.query(
         "SELECT id, password_hash FROM identity_access.identities WHERE login_normalized = $1 AND status = 'active'", [login],
       );
-      if (!await verifyPassword(input.password, identity?.password_hash)) throw unauthorized();
+      if (!await verifyPassword(input.password, identity?.password_hash)) {
+        await recordDeniedLogin(requestId);
+        throw unauthorized();
+      }
       const scope = await confirmSelection(identity.id, selected);
-      if (!scope) throw unauthorized();
-      return openSession(repo, identity.id, scope);
+      if (!scope) {
+        await recordDeniedLogin(requestId, identity.id);
+        throw unauthorized();
+      }
+      return repo.transaction(db => openSession(db, identity.id, scope, requestId));
     },
 
     async requestOtp(input) {
@@ -152,7 +168,7 @@ export function createAuthService({ pool, resolveMembership, deliverOtp, accessS
       return { challengeId, expiresAt };
     },
 
-    async verifyOtp(input) {
+    async verifyOtp(input, { requestId } = {}) {
       const { challengeId, code } = input;
       if (typeof challengeId !== 'string' || !UUID.test(challengeId) ||
           typeof code !== 'string' || !/^\d{6}$/.test(code)) throw invalid();
@@ -174,9 +190,12 @@ export function createAuthService({ pool, resolveMembership, deliverOtp, accessS
         const scope = await confirmSelection(challenge.identity_id, {
           tenantId: challenge.tenant_id, membershipId: challenge.membership_id,
         });
-        return scope ? openSession(db, challenge.identity_id, scope) : null;
+        return scope ? openSession(db, challenge.identity_id, scope, requestId) : null;
       });
-      if (!outcome) throw invalid();
+      if (!outcome) {
+        await recordDeniedLogin(requestId);
+        throw invalid();
+      }
       return outcome;
     },
 

@@ -19,13 +19,17 @@ export function createAccessRoutes({ access, makeError, budget = { max: 30, wind
 
   return [
     route('getMyCapabilities', async ({ identity }) => ({ data: await access.capabilities(identity) })),
-    route('listRoles', ({ identity, page }) => access.listRoles(identity, page)),
-    route('createRole', async ({ identity, body }) => ({ status: 201, data: await access.createRole(identity, body) })),
-    route('updateRole', async ({ identity, params, ifMatch, body }) => {
-      const data = await access.updateRole(identity, params.roleId, ifMatch, body);
+    route('listRoles', ({ identity, page, requestId }) => access.listRoles(identity, page, requestId)),
+    route('createRole', async ({ identity, body, requestId }) => ({
+      status: 201, data: await access.createRole(identity, body, requestId),
+    })),
+    route('updateRole', async ({ identity, params, ifMatch, body, requestId }) => {
+      const data = await access.updateRole(identity, params.roleId, ifMatch, body, requestId);
       return { data, etag: `"${data.version}"` };
     }),
-    route('assignRole', async ({ identity, body }) => ({ status: 201, data: await access.assignRole(identity, body) })),
+    route('assignRole', async ({ identity, body, requestId }) => ({
+      status: 201, data: await access.assignRole(identity, body, requestId),
+    })),
   ];
 }
 

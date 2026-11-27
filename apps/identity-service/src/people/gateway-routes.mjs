@@ -18,10 +18,10 @@ export function createPeopleRoutes({ service, GatewayError, budget = { max: 30, 
     };
   }
 
-  const write = ({ identity, body }) => ({ identity, body });
+  const write = ({ identity, body, requestId }) => ({ identity, body, requestId });
   return [
-    route('listUsers', 'listUsers', 200, ({ identity, page }) => ({ identity, page }), true),
-    route('getUser', 'getUser', 200, ({ identity, params }) => ({ identity, profileId: params.userId })),
+    route('listUsers', 'listUsers', 200, ({ identity, page, requestId }) => ({ identity, page, requestId }), true),
+    route('getUser', 'getUser', 200, ({ identity, params, requestId }) => ({ identity, profileId: params.userId, requestId })),
     route('createUser', 'createUser', 201, write),
     route('createMembership', 'createMembership', 201, write),
     route('createInvitation', 'createInvitation', 202, write),
