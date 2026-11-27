@@ -1,0 +1,141 @@
+.management-main { max-inline-size: 70rem; padding-block: clamp(2rem, 5vw, 4.75rem); }
+.management-intro { margin-block-end: 1.25rem; max-inline-size: 52rem; }
+.management-intro h1 {
+  margin-block: .4rem .75rem;
+  font-size: clamp(1.88rem, 4.3vw, 3.5rem);
+  line-height: 1.24;
+  font-weight: 840;
+}
+.management-intro > p:last-child,
+.management-scope > p,
+.management-empty { color: var(--edu-muted); }
+.management-role { max-inline-size: 17rem; margin-block-end: 1rem; }
+.management-session {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  margin-block-end: 1rem;
+}
+.management-session p { color: var(--edu-muted); font-weight: 700; }
+.management-card { padding: clamp(1rem, 3vw, 1.5rem); }
+.management-card h2 { font-size: 1.26rem; font-weight: 800; margin-block-end: .8rem; }
+.management-card > p, .management-card li > p { font-size: .9rem; }
+.management-customers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: .65rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.management-customer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: start;
+  gap: .6rem;
+  min-block-size: 3.9rem;
+  width: 100%;
+  padding: .65rem .8rem;
+  border: 1px solid var(--edu-line);
+  border-radius: .65rem;
+  color: var(--edu-ink);
+  background: var(--edu-paper);
+  font: .91rem/1.42 var(--edu-font);
+}
+button.management-customer { cursor: pointer; }
+button.management-customer:focus-visible, .management-scope:focus-visible {
+  outline: .15rem solid var(--edu-focus);
+  outline-offset: .2rem;
+}
+button.management-customer:disabled { opacity: .65; cursor: wait; }
+button.management-customer:hover:enabled, .management-customer[aria-pressed='true'] {
+  background: var(--edu-tint);
+  border-color: var(--edu-accent);
+}
+.management-customer strong, .management-list strong { overflow-wrap: anywhere; }
+.management-customer small, .management-list small {
+  display: block;
+  margin-block-start: .25rem;
+  color: var(--edu-muted);
+  font-size: .8rem;
+}
+.management-tag {
+  display: inline-block;
+  flex: 0 0 auto;
+  color: var(--edu-muted);
+  padding: .24rem .52rem;
+  border-radius: .45rem;
+  background: var(--edu-canvas);
+  font-size: .76rem;
+  font-weight: 760;
+}
+.management-tag[data-state='active'], .management-tag[data-state='approved'] {
+  color: var(--edu-accent);
+  background: var(--edu-tint);
+}
+.management-tag[data-state='pending'] { color: #694518; background: #fff4dc; }
+.management-tag[data-state='suspended'], .management-tag[data-state='deleted'],
+.management-tag[data-state='rejected'], .management-tag[data-state='stale'] {
+  color: var(--edu-error);
+  background: var(--edu-error-surface);
+}
+.management-scope { margin-block: 1.65rem .85rem; }
+.management-scope h2 { font-size: clamp(1.35rem, 2.5vw, 1.8rem); overflow-wrap: anywhere; }
+.management-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .85rem;
+  margin-block-end: .85rem;
+}
+.management-list { list-style: none; margin: 0; padding: 0; }
+.management-list > li {
+  min-inline-size: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .5rem;
+  margin-block-start: .3rem;
+  padding-block: .55rem;
+  border-block-end: 1px solid var(--edu-line);
+  font-size: .9rem;
+}
+.management-list > li:last-child { border-block-end: 0; }
+.management-code {
+  max-inline-size: 45%;
+  color: var(--edu-muted);
+  overflow-wrap: anywhere;
+  font: .76rem/1.5 var(--edu-font);
+}
+.management-request {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(14rem, .72fr);
+  align-items: center;
+  gap: .85rem 1.2rem;
+  padding: .85rem .9rem;
+  margin-block-end: .6rem;
+  border: 1px solid var(--edu-line);
+  border-radius: .65rem;
+  background: var(--edu-canvas);
+}
+.management-request p, .management-approval-list p { color: var(--edu-muted); font-size: .85rem; }
+.management-approval-list > li {
+  display: block;
+  padding: .65rem .1rem .85rem;
+}
+.management-approval-list .management-actions { margin-block-start: .5rem; }
+.management-approval-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem;
+}
+.management-buttons { display: flex; flex-wrap: wrap; gap: .5rem; margin-block-start: .5rem; }
+.management-feedback { margin-block: .75rem; }
+@media (max-width: 52rem) { .management-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 37rem) {
+  .management-metrics, .management-request { grid-template-columns: minmax(0, 1fr); }
+  .management-scope { margin-block-start: 1.2rem; }
+}

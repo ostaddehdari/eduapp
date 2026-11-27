@@ -15,26 +15,41 @@ export function createGatewayRuntime({ monitoring, gatewayOptions = {}, identity
   if (tenancy && !tenancy.authorize && !identity?.accessPolicy) {
     throw new TypeError('Tenancy requires Access policy or explicit owner authorization');
   }
-  if (tenancy?.onboarding) {
-    const { schoolPool, sitesPool } = tenancy.onboarding;
-    const pools = [identity?.iamPool, identity?.accessPool, identity?.peoplePool, tenancy.pool, schoolPool, sitesPool];
-    if (!identity || pools.some(pool => typeof pool?.connect !== 'function') || new Set(pools).size !== pools.length) {
-      throw new TypeError('Onboarding requires separate School, Sites, Tenancy and identity pools');
+  if (tenancy?.onboarding || tenancy?.management || tenancy?.fieldsPool) {
+    const pools = [identity?.iamPool, identity?.accessPool, identity?.peoplePool, tenancy.pool];
+    if (tenancy.onboarding) pools.push(tenancy.onboarding.schoolPool, tenancy.onboarding.sitesPool);
+    if (tenancy.management) pools.push(tenancy.management.billingPool);
+    if (tenancy.fieldsPool) pools.push(tenancy.fieldsPool);
+    if (pools.some(pool => typeof pool?.connect !== 'function') || new Set(pools).size !== pools.length) {
+      throw new TypeError('Configured owners require distinct database pools');
     }
   }
   const tenancyOptions = tenancy ? createTenancyGatewayOptions({
     ...tenancy,
-    authorize: tenancy.authorize ?? (({ identity: principal, tenantId, action }) =>
-      identityOptions.authorizeTenancy(principal, { tenantId, action, orgUnitId: null })),
+    authorize: tenancy.authorize ?? (({ identity: principal, tenantId, action, orgUnitId = null, subjectId }) =>
+      identityOptions.authorizeTenancy(principal, { tenantId, action, orgUnitId, subjectId })),
     onboarding: tenancy.onboarding && {
       ...tenancy.onboarding,
       inviteManager: input => identityOptions.inviteManager(input),
+    },
+    management: tenancy.management && {
+      ...tenancy.management,
+      accessPool: identity?.accessPool,
+      requireRecentMfa: principal => identityOptions.requireRecentMfa(principal),
     },
   }) : {};
   const identityOptions = identity ? createIdentityGatewayOptions({
     ...identity, tenantActive: tenancyOptions.isActive,
     verifyOrgUnit: tenancyOptions.verifyOrgUnit ?? identity.verifyOrgUnit,
     scopedInvitations: Boolean(tenancy),
+    registryOwnerFields: Boolean(tenancy?.fieldsPool),
+    allowPlatformStepUp: tenancy?.management && (async principal => {
+      const scopes = await tenancy.management.resolvePlatformScopes({
+        identity: { ...principal, actor: principal.identityId, scope: 'identity-bootstrap' },
+      });
+      return Array.isArray(scopes) && scopes.some(scope =>
+        scope?.requestStatusChange === true || scope?.decideStatusChange === true);
+    }),
   }) : {};
   const monitor = monitoring && createGatewayMonitor({ mode: monitoring.mode, emit });
   const ready = monitoring?.apiPort ? createApiReadinessProbe(monitoring.apiPort) : gatewayOptions.ready;

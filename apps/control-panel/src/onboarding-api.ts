@@ -9,14 +9,14 @@ export class GatewayRequestError extends Error {
   }
 }
 
-export function createOnboardingClient(config: string, transport: typeof fetch = fetch) {
+export function createGatewayCall(config: string, transport: typeof fetch = fetch) {
   const base = config.replace(/\/+$/, '');
   if (base !== base.trim() || !/^\/[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*$/.test(base)) {
     throw new GatewayRequestError(503);
   }
   const api = base + '/v1';
 
-  async function call(path: string, accessToken?: string, body?: object) {
+  return async function call(path: string, accessToken?: string, body?: object) {
     const response = await transport(api + path, {
       method: body === undefined ? 'GET' : 'POST',
       headers: {
@@ -31,7 +31,11 @@ export function createOnboardingClient(config: string, transport: typeof fetch =
     if (!response.ok) throw new GatewayRequestError(response.status);
     if (response.status === 204) return undefined;
     return (await response.json() as { data?: unknown }).data;
-  }
+  };
+}
+
+export function createOnboardingClient(config: string, transport: typeof fetch = fetch) {
+  const call = createGatewayCall(config, transport);
 
   function checkedState(value: unknown) {
     const state = readOnboardingState(value);

@@ -5,7 +5,9 @@ const roleRecord = (row) => ({
   roleId: row.id, name: row.name, version: row.version, rules: row.rules, builtin: row.builtin,
 });
 
-export function createPostgresAccessRepository({ transactions, appendSecurityEvent, registryOwnerInvitations }) {
+export function createPostgresAccessRepository({
+  transactions, appendSecurityEvent, registryOwnerInvitations, registryOwnerFields,
+}) {
   const ownerJoin = registryOwnerInvitations ? `
     LEFT JOIN identity_access.registry_owner_receipts AS receipt
       ON receipt.tenant_id = m.tenant_id AND receipt.membership_id = m.id
@@ -13,6 +15,12 @@ export function createPostgresAccessRepository({ transactions, appendSecurityEve
   const ownerColumn = registryOwnerInvitations
     ? "(receipt.membership_id IS NOT NULL AND r.builtin AND r.name = 'Tenant owner' AND b.scope_org_id IS NULL)"
     : 'false';
+  const ownerActions = [
+    'access.invitation.create',
+    ...(registryOwnerFields ? [
+      'fields.definition.read', 'fields.definition.write', 'fields.school.read', 'fields.school.write',
+    ] : []),
+  ].map(action => ({ action, effect: 'allow' }));
   return Object.freeze({
     readBindings({ tenantId, membershipId, identityId }) {
       return transactions.run(tenantId, async db => {
@@ -28,7 +36,7 @@ export function createPostgresAccessRepository({ transactions, appendSecurityEve
         return rows.map(row => ({
           orgUnitId: row.scope_org_id,
           rules: row.bootstrap_owner
-            ? [...row.rules, { action: 'access.invitation.create', effect: 'allow' }]
+            ? [...row.rules, ...ownerActions]
             : row.rules,
         }));
       });
