@@ -116,6 +116,10 @@ export function applyManagementPanel(client) {
   return applyMigration(client, '0012-management-panel', '0008-organization-tree');
 }
 
+export function applyPlanCatalog(client) {
+  return applyMigration(client, '0013-plan-catalog', foundationVersion);
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const mode = process.argv[2];
   const connectionString = process.env.EDUAPP_DATABASE_URL;

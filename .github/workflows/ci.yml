@@ -113,6 +113,8 @@ jobs:
         run: node --test --test-concurrency=1 tests/S03-W05/*.test.mjs
       - name: Validate the S03 evidence gate
         run: node scripts/validate-stage-gate-s03.mjs
+      - name: Validate the S04 evidence gate
+        run: node scripts/validate-stage-gate-s04.mjs
       - name: Test tenant provisioning and organization tree isolation
         env:
           EDUAPP_S04_REGISTRY_PG_ADMIN_URL: postgres://eduapp_ci:eduapp_ci_only@127.0.0.1:55432/eduapp_s04_registry_test
@@ -129,6 +131,10 @@ jobs:
           EDUAPP_S04_MANAGEMENT_PG_ADMIN_URL: postgres://eduapp_ci:eduapp_ci_only@127.0.0.1:55432/eduapp_s04_management_test
           EDUAPP_S04_REGISTRY_PG_ADMIN_URL: postgres://eduapp_ci:eduapp_ci_only@127.0.0.1:55432/eduapp_s04_registry_test
         run: node --test --test-concurrency=1 tests/S04-W05/*.test.mjs tests/S04-W06/management*.test.mjs
+      - name: Test immutable plan catalog and tenant-scoped quotes
+        env:
+          EDUAPP_S05_CATALOG_PG_ADMIN_URL: postgres://eduapp_ci:eduapp_ci_only@127.0.0.1:55432/eduapp_s05_catalog_test
+        run: node --test --test-concurrency=1 tests/S05-W01/*.test.mjs
       - name: Test the Persian control panel and verify the published preview bundle
         run: |
           node --test --test-concurrency=1 tests/S04-W03/browser.test.mjs tests/S04-W06/browser.test.mjs
