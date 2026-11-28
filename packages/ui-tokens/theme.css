@@ -185,15 +185,3 @@ h1, h2, p, dl, dd { margin: 0; }
 @media (prefers-reduced-motion: reduce) {
   .edu-details summary { transition: none; }
 }
-
-.edu-purchase { grid-column: 1 / -1; }
-.edu-purchase .edu-card-body { display: grid; gap: .75rem; }
-.edu-purchase select, .edu-purchase input[type='number'] {
-  font: inherit; padding: .65rem; max-inline-size: 24rem; border: 1px solid var(--edu-line); border-radius: .5rem;
-}
-.edu-purchase fieldset { border: 1px solid var(--edu-line); border-radius: .7rem; }
-.edu-choice { display: inline-flex; gap: .5rem; margin-inline-end: 1rem; align-items: center; min-block-size: 2.75rem; }
-.edu-summary { padding: 1rem; background: var(--edu-tint); border-radius: .7rem; display: grid; gap: .6rem; }
-.edu-summary dl { display: grid; gap: .25rem; }
-.edu-summary dl > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem; }
-.edu-summary dt { font-weight: 650; }
