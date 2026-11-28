@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import './purchase.css';
 import { formatPersianTimestamp, readSchoolPreview, schoolOptions } from '@eduapp/ui-tokens/preview';
 import { pageTitle } from './view-model';
 import { purchaseSummary, readOffers, type Offer } from './purchase';
