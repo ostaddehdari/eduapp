@@ -1,0 +1,26 @@
+{
+  "stage": "S04",
+  "decision": "GO_FOR_S05_DEVELOPMENT",
+  "production_api": "NOT_VERIFIED",
+  "base_source_sha": "4b0bc28b6fd498bee4dcc08cf05976d794f1d33d",
+  "required_works": [
+    "S04-W01",
+    "S04-W02",
+    "S04-W03",
+    "S04-W04",
+    "S04-W05",
+    "S04-W06"
+  ],
+  "evidence_runs": [
+    46004529753,
+    46020509410,
+    46034638982
+  ],
+  "production_preview_run": 46035178258,
+  "production_api_observation": {
+    "path": "/eduapp/api/v1/health/ready",
+    "status": 404,
+    "source": "projects/eduapp/logs/S04-W06-T03/deployment-46035178258.md"
+  },
+  "next_task": "S05-W01-T01"
+}
