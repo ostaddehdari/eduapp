@@ -146,6 +146,11 @@ jobs:
           node --import tsx --test tests/S05-W03/*.test.ts
           node --test --test-concurrency=1 tests/S05-W04/*.test.mjs
           node --test tests/S05-W03/browser.test.mjs
+      - name: Test verified payment and owner-approved delegation with two tenants
+        env:
+          EDUAPP_S05_PAYMENT_PG_ADMIN_URL: postgres://eduapp_ci:eduapp_ci_only@127.0.0.1:55432/eduapp_s05_payment_test
+          EDUAPP_S05_DELEGATION_PG_ADMIN_URL: postgres://eduapp_ci:eduapp_ci_only@127.0.0.1:55432/eduapp_s05_delegation_test
+        run: node --test --test-concurrency=1 tests/S05-W05/*.test.mjs tests/S05-W06/*.test.mjs
       - name: Test the Persian control panel and verify the published preview bundle
         run: |
           node --test --test-concurrency=1 tests/S04-W03/browser.test.mjs tests/S04-W06/browser.test.mjs
