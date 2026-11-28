@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
 import { createGatewayMonitor } from '../../../infra/monitoring/gateway-monitor.mjs';
 import { createApiReadinessProbe, createMetricsServer } from '../../../infra/monitoring/runtime.mjs';
-import { createGateway } from './gateway.mjs';
+import { createGateway, GatewayError } from './gateway.mjs';
 import { createIdentityGatewayOptions } from './identity-options.mjs';
 import { createTenancyGatewayOptions } from './tenancy-options.mjs';
 import { createCommerceGatewayOptions } from '../../commerce-service/src/routes.mjs';
@@ -31,7 +31,7 @@ export function createGatewayRuntime({ monitoring, gatewayOptions = {}, identity
       tenancy?.management?.billingPool].includes(commerce.pool))) {
     throw new TypeError('Commerce requires an independent billing owner pool');
   }
-  const commerceOptions = commerce ? createCommerceGatewayOptions(commerce) : {};
+  const commerceOptions = commerce ? createCommerceGatewayOptions(commerce, GatewayError) : {};
   const tenancyOptions = tenancy ? createTenancyGatewayOptions({
     ...tenancy,
     authorize: tenancy.authorize ?? (({ identity: principal, tenantId, action, orgUnitId = null, subjectId }) =>
