@@ -50,6 +50,11 @@
         "contract": "S04-W06",
         "owner": "tenancy_organization",
         "operations": ["getManagementOverview", "createManagementStatusRequest", "decideManagementStatusRequest"]
+      },
+      {
+        "contract": "S05-W06",
+        "owner": "commercial_billing",
+        "operations": ["requestManagementDelegation", "decideManagementDelegation", "checkManagementDelegation"]
       }
     ],
     "domain_authorization": "domain_owner",
