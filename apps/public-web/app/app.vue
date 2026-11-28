@@ -162,10 +162,10 @@ onMounted(async () => {
             <dl>
               <div><dt>مالک قرارداد</dt><dd>{{ summary.owner }}</dd></div>
               <div><dt>ماژول‌ها</dt><dd>{{ summary.modules.join('، ') || 'هیچ‌کدام' }}</dd></div>
-              <div><dt>صندلی</dt><dd>{{ summary.seats }}</dd></div>
+              <div><dt>صندلی</dt><dd>{{ summary.seats.toLocaleString('fa-IR') }}</dd></div>
               <div><dt>مبلغ پایهٔ پلن</dt><dd>{{ Number(summary.amountMinor).toLocaleString('fa-IR') }} ریال</dd></div>
-              <div><dt>مدت قرارداد</dt><dd>{{ summary.termDays }} روز</dd></div>
-              <div><dt>آزمایش اولیهٔ مشروط</dt><dd>{{ summary.trialDays }} روز؛ فقط در صورت واجد شرایط بودن</dd></div>
+              <div><dt>مدت قرارداد</dt><dd>{{ summary.termDays.toLocaleString('fa-IR') }} روز</dd></div>
+              <div><dt>آزمایش اولیهٔ مشروط</dt><dd>{{ summary.trialDays.toLocaleString('fa-IR') }} روز؛ فقط در صورت واجد شرایط بودن</dd></div>
             </dl>
             <p>{{ summary.pricingNote }}</p>
             <p>مبلغ نهایی، تخفیف و شرایط تمدید پس از ورود و دریافت پیش‌فاکتور اختصاصی تأیید می‌شوند. پرداخت در این مرحله فعال نیست.</p>

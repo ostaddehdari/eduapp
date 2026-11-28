@@ -144,8 +144,8 @@ jobs:
           EDUAPP_S05_CHECKOUT_PG_ADMIN_URL: postgres://eduapp_ci:eduapp_ci_only@127.0.0.1:55432/eduapp_s05_checkout_test
         run: |
           node --import tsx --test tests/S05-W03/*.test.ts
-          node --test tests/S05-W03/browser.test.mjs
           node --test --test-concurrency=1 tests/S05-W04/*.test.mjs
+          node --test tests/S05-W03/browser.test.mjs
       - name: Test the Persian control panel and verify the published preview bundle
         run: |
           node --test --test-concurrency=1 tests/S04-W03/browser.test.mjs tests/S04-W06/browser.test.mjs
