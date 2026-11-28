@@ -4,8 +4,9 @@ import { createApiReadinessProbe, createMetricsServer } from '../../../infra/mon
 import { createGateway } from './gateway.mjs';
 import { createIdentityGatewayOptions } from './identity-options.mjs';
 import { createTenancyGatewayOptions } from './tenancy-options.mjs';
+import { createCommerceGatewayOptions } from '../../commerce-service/src/routes.mjs';
 
-export function createGatewayRuntime({ monitoring, gatewayOptions = {}, identity, tenancy, emit } = {}) {
+export function createGatewayRuntime({ monitoring, gatewayOptions = {}, identity, tenancy, commerce, emit } = {}) {
   if (identity && gatewayOptions.authenticate) {
     throw new TypeError('Use one Gateway authentication provider');
   }
@@ -24,6 +25,12 @@ export function createGatewayRuntime({ monitoring, gatewayOptions = {}, identity
       throw new TypeError('Configured owners require distinct database pools');
     }
   }
+  if (commerce && (typeof commerce.pool?.connect !== 'function' || typeof commerce.pool?.query !== 'function' ||
+    [identity?.iamPool, identity?.accessPool, identity?.peoplePool, tenancy?.pool,
+      tenancy?.management?.billingPool].includes(commerce.pool))) {
+    throw new TypeError('Commerce requires an independent billing owner pool');
+  }
+  const commerceOptions = commerce ? createCommerceGatewayOptions(commerce) : {};
   const tenancyOptions = tenancy ? createTenancyGatewayOptions({
     ...tenancy,
     authorize: tenancy.authorize ?? (({ identity: principal, tenantId, action, orgUnitId = null, subjectId }) =>
@@ -57,7 +64,8 @@ export function createGatewayRuntime({ monitoring, gatewayOptions = {}, identity
     { requestTimeout: 30_000, headersTimeout: 10_000 },
     createGateway({
       ...gatewayOptions, ...identityOptions, ready, monitor,
-      routes: [...(gatewayOptions.routes ?? []), ...(identityOptions.routes ?? []), ...(tenancyOptions.routes ?? [])],
+      routes: [...(gatewayOptions.routes ?? []), ...(identityOptions.routes ?? []),
+        ...(tenancyOptions.routes ?? []), ...(commerceOptions.routes ?? [])],
     }),
   );
   return { gateway, metrics: monitor ? createMetricsServer(monitor) : null };
