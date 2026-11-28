@@ -57,8 +57,9 @@ test('paid seats require owner approval, exact scope and expiry; revocation is i
   }
   const paid = await order(tenantA, 'paid'), pending = await order(tenantB, 'pending_payment');
   let instant = new Date('2026-11-28T12:00:00Z');
+  let currentOwnerA = ownerA;
   const service = createDelegationService({ pool, now: () => instant,
-    resolveOwner: async ({ tenantId }) => tenantId === tenantA ? ownerA : ownerB,
+    resolveOwner: async ({ tenantId }) => tenantId === tenantA ? currentOwnerA : ownerB,
     scopeExists: async ({ tenantId, scopeOrgId }) => tenantId === tenantA && scopeOrgId === scopeA,
     authorizePurchase: async ({ identity }) => identity.canBuy === true,
     authorizeOwner: async ({ identity }) => identity.mfa === true,
@@ -87,6 +88,9 @@ test('paid seats require owner approval, exact scope and expiry; revocation is i
   assert.equal(await service.canManage({ identity: target, scopeOrgId: scopeA }), true);
   assert.equal(await service.canManage({ identity: target, scopeOrgId: scopeB }), false);
   assert.equal(await service.canManage({ identity: person(tenantB, delegate), scopeOrgId: scopeA }), false);
+  currentOwnerA = randomUUID();
+  assert.equal(await service.canManage({ identity: target, scopeOrgId: scopeA }), false);
+  currentOwnerA = ownerA;
   await service.decide({ identity: owner, delegationId: first.id, action: 'revoke' });
   assert.equal(await service.canManage({ identity: target, scopeOrgId: scopeA }), false);
   assert.equal((await admin.query(`SELECT count(*)::integer AS n FROM commercial_billing.management_delegations

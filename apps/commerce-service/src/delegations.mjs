@@ -75,12 +75,14 @@ export function createDelegationService({ pool, resolveOwner, scopeExists, autho
   // a paid subscription alone never creates an IAM membership or role binding.
   async function canManage({ identity, scopeOrgId }) {
     if (!valid(identity) || !uuid(scopeOrgId)) return false;
+    const ownerId = await resolveOwner({ tenantId: identity.tenantId });
+    if (!uuid(ownerId)) return false;
     return tx.run(identity.tenantId, async db => {
       const { rows: [found] } = await db.query(`SELECT 1 FROM commercial_billing.management_delegations d
         JOIN commercial_billing.subscriptions s ON s.tenant_id=d.tenant_id AND s.id=d.subscription_id
-        WHERE d.tenant_id=$1 AND d.delegate_identity_id=$2 AND d.scope_org_id=$3
+        WHERE d.tenant_id=$1 AND d.delegate_identity_id=$2 AND d.scope_org_id=$3 AND d.owner_identity_id=$5
           AND d.approved_at IS NOT NULL AND d.revoked_at IS NULL AND d.expires_at > $4 AND s.status='active'
-        LIMIT 1`, [identity.tenantId, identity.actorId, scopeOrgId, now()]);
+        LIMIT 1`, [identity.tenantId, identity.actorId, scopeOrgId, now(), ownerId]);
       return Boolean(found);
     });
   }
