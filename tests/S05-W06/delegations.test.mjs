@@ -44,7 +44,8 @@ test('paid seats require owner approval, exact scope and expiry; revocation is i
     VALUES ($1,1,100000,'IRR','2026-11-27T00:00:00Z','["school"]','{"seats":1}') RETURNING id`, [plan.id]);
   async function order(tenantId, status) {
     const { rows: [sub] } = await admin.query(`INSERT INTO commercial_billing.subscriptions
-      (tenant_id,plan_version_id,status) VALUES ($1,$2,$3) RETURNING id`, [tenantId, version.id, status]);
+      (tenant_id,plan_version_id,status) VALUES ($1,$2,$3) RETURNING id`,
+    [tenantId, version.id, status === 'paid' ? 'active' : status]);
     const { rows: [invoice] } = await admin.query(`INSERT INTO commercial_billing.invoices
       (tenant_id,subscription_id,amount_minor,currency,status) VALUES ($1,$2,100000,'IRR',$3) RETURNING id`,
     [tenantId, sub.id, status]);
