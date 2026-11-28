@@ -1,12 +1,42 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { formatPersianTimestamp, readSchoolPreview, schoolOptions } from '@eduapp/ui-tokens/preview';
 import { pageTitle } from './view-model';
+import { purchaseSummary, readOffers, type Offer } from './purchase';
 
 const route = useRoute();
 const school = computed(() => readSchoolPreview(route.query.school));
 const changed = computed(() => formatPersianTimestamp(school.value?.updatedAt));
 useHead({ title: pageTitle });
+const offers = ref<Offer[]>([]);
+const offerId = ref('');
+const selectedModules = ref<string[]>([]);
+const seats = ref(1);
+const loading = ref(true);
+const catalogError = ref('');
+const selectedOffer = computed(() => offers.value.find(item => item.id === offerId.value));
+const summary = computed(() => {
+  if (!selectedOffer.value) return null;
+  try { return purchaseSummary(selectedOffer.value, selectedModules.value, seats.value); }
+  catch { return null; }
+});
+function chooseOffer(id: string) {
+  const offer = offers.value.find(item => item.id === id);
+  offerId.value = offer?.id ?? '';
+  selectedModules.value = offer ? [...offer.modules] : [];
+  seats.value = 1;
+}
+onMounted(async () => {
+  try {
+    const response = await fetch('/eduapp/api/v1/plans?limit=100', { headers: { Accept: 'application/json' } });
+    if (!response.ok) throw new Error('فهرست پلن‌ها در دسترس نیست.');
+    offers.value = readOffers(await response.json());
+    if (offers.value.length) chooseOffer(offers.value[0]!.id);
+    else catalogError.value = 'هنوز پلنی برای خرید منتشر نشده است.';
+  } catch {
+    catalogError.value = 'قیمت‌ها فعلاً در دسترس نیستند. لطفاً بعداً دوباره تلاش کنید.';
+  } finally { loading.value = false; }
+});
 </script>
 
 <template>
@@ -26,6 +56,7 @@ useHead({ title: pageTitle });
         class="edu-nav"
         aria-label="ناوبری سایت"
       >
+        <a href="#purchase">انتخاب پلن</a>
         <a href="#school-preview">نمای مدرسه</a>
         <a href="https://srun.ir/eduapp/api/docs/">راهنمای API</a>
       </nav>
@@ -57,6 +88,97 @@ useHead({ title: pageTitle });
         class="edu-primary"
         href="#school-preview"
       >مشاهدهٔ نمای مدرسه</a>
+    </section>
+
+    <section
+      id="purchase"
+      class="edu-card edu-purchase"
+      aria-labelledby="purchase-title"
+    >
+      <div class="edu-card-head">
+        <h2 id="purchase-title">
+          انتخاب پلن
+        </h2>
+      </div>
+      <div class="edu-card-body">
+        <p
+          v-if="loading"
+          role="status"
+        >
+          در حال دریافت قیمت‌های منتشرشده…
+        </p>
+        <p
+          v-else-if="catalogError"
+          role="status"
+          class="edu-error"
+        >
+          {{ catalogError }}
+        </p>
+        <template v-else-if="selectedOffer">
+          <label for="edu-plan">پلن و نسخه</label>
+          <select
+            id="edu-plan"
+            :value="offerId"
+            @change="chooseOffer(($event.target as HTMLSelectElement).value)"
+          >
+            <option
+              v-for="offer in offers"
+              :key="offer.id"
+              :value="offer.id"
+            >
+              {{ offer.code }}، نسخهٔ {{ offer.version }}
+            </option>
+          </select>
+          <fieldset>
+            <legend>ماژول‌های موردنیاز</legend>
+            <label
+              v-for="module in selectedOffer.modules"
+              :key="module"
+              class="edu-choice"
+            >
+              <input
+                v-model="selectedModules"
+                type="checkbox"
+                :value="module"
+              >{{ module }}
+            </label>
+          </fieldset>
+          <label for="edu-seats">تعداد صندلی (حداکثر {{ selectedOffer.quotas.seats }})</label>
+          <input
+            id="edu-seats"
+            v-model.number="seats"
+            type="number"
+            min="1"
+            :max="selectedOffer.quotas.seats"
+            step="1"
+            inputmode="numeric"
+          >
+          <div
+            v-if="summary"
+            class="edu-summary"
+            aria-live="polite"
+          >
+            <h3>خلاصه پیش از پرداخت</h3>
+            <dl>
+              <div><dt>مالک قرارداد</dt><dd>{{ summary.owner }}</dd></div>
+              <div><dt>ماژول‌ها</dt><dd>{{ summary.modules.join('، ') || 'هیچ‌کدام' }}</dd></div>
+              <div><dt>صندلی</dt><dd>{{ summary.seats }}</dd></div>
+              <div><dt>مبلغ پایهٔ پلن</dt><dd>{{ Number(summary.amountMinor).toLocaleString('fa-IR') }} ریال</dd></div>
+              <div><dt>مدت قرارداد</dt><dd>{{ summary.termDays }} روز</dd></div>
+              <div><dt>آزمایش اولیهٔ مشروط</dt><dd>{{ summary.trialDays }} روز؛ فقط در صورت واجد شرایط بودن</dd></div>
+            </dl>
+            <p>{{ summary.pricingNote }}</p>
+            <p>مبلغ نهایی، تخفیف و شرایط تمدید پس از ورود و دریافت پیش‌فاکتور اختصاصی تأیید می‌شوند. پرداخت در این مرحله فعال نیست.</p>
+          </div>
+          <p
+            v-else
+            role="alert"
+            class="edu-error"
+          >
+            تعداد صندلی یا ماژول‌های انتخاب‌شده را اصلاح کنید.
+          </p>
+        </template>
+      </div>
     </section>
 
     <section
