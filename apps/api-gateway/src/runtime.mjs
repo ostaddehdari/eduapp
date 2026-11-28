@@ -5,6 +5,7 @@ import { createGateway } from './gateway.mjs';
 import { createIdentityGatewayOptions } from './identity-options.mjs';
 import { createTenancyGatewayOptions } from './tenancy-options.mjs';
 import { createCommerceGatewayOptions } from '../../commerce-service/src/routes.mjs';
+import { createPaymentWebhookHandler } from '../../commerce-service/src/webhook-http.mjs';
 
 export function createGatewayRuntime({ monitoring, gatewayOptions = {}, identity, tenancy, commerce, emit } = {}) {
   if (identity && gatewayOptions.authenticate) {
@@ -60,13 +61,16 @@ export function createGatewayRuntime({ monitoring, gatewayOptions = {}, identity
   }) : {};
   const monitor = monitoring && createGatewayMonitor({ mode: monitoring.mode, emit });
   const ready = monitoring?.apiPort ? createApiReadinessProbe(monitoring.apiPort) : gatewayOptions.ready;
-  const gateway = createServer(
-    { requestTimeout: 30_000, headersTimeout: 10_000 },
-    createGateway({
+  const gatewayHandler = createGateway({
       ...gatewayOptions, ...identityOptions, ready, monitor,
       routes: [...(gatewayOptions.routes ?? []), ...(identityOptions.routes ?? []),
         ...(tenancyOptions.routes ?? []), ...(commerceOptions.routes ?? [])],
-    }),
+    });
+  const webhook = commerce?.payment && createPaymentWebhookHandler(commerce.payment);
+  const gateway = createServer(
+    { requestTimeout: 30_000, headersTimeout: 10_000 },
+    (req, res) => req.url?.startsWith('/v1/webhooks/payments/') && webhook
+      ? webhook(req, res) : gatewayHandler(req, res),
   );
   return { gateway, metrics: monitor ? createMetricsServer(monitor) : null };
 }

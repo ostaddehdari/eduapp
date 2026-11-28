@@ -128,6 +128,14 @@ export function applyCheckout(client) {
   return applyMigration(client, '0015-checkout', '0014-feature-entitlements');
 }
 
+export function applyPaymentVerification(client) {
+  return applyMigration(client, '0016-payment-verification', '0015-checkout');
+}
+
+export function applyManagementDelegation(client) {
+  return applyMigration(client, '0017-management-delegation', '0016-payment-verification');
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const mode = process.argv[2];
   const connectionString = process.env.EDUAPP_DATABASE_URL;
