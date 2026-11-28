@@ -70,6 +70,8 @@ test('orders, invoice, retry, grace and cancellation stay scoped to two tenants'
   const foreign = await transactions.run(tenantB, db => db.query('SELECT id FROM commercial_billing.checkout_orders WHERE tenant_id = $1', [tenantA]));
   assert.equal(foreign.rowCount, 0);
   await assert.rejects(checkout.transition({ identity: identity(tenantB), orderId: first.id, action: 'cancel' }), { message: 'NOT_FOUND' });
+  await assert.rejects(checkout.transition({ identity: identity(tenantA), orderId: first.id,
+    action: 'grace', graceUntil: '2027-03-01T00:00:00Z' }), { message: 'INVALID_REQUEST' });
   const grace = await checkout.transition({ identity: identity(tenantA), orderId: first.id,
     action: 'grace', graceUntil: '2026-12-05T00:00:00Z' });
   assert.equal(grace.status, 'grace');

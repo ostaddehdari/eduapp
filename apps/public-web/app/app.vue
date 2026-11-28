@@ -109,7 +109,7 @@ onMounted(async () => {
         </p>
         <p
           v-else-if="catalogError"
-          role="status"
+          role="alert"
           class="edu-error"
         >
           {{ catalogError }}

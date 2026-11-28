@@ -65,7 +65,8 @@ export function createCheckout({ pool, authorizeOrder, authorizeLifecycle, now =
 
   async function transition({ identity, orderId, action, graceUntil }) {
     if (!validIdentity(identity) || !uuid(orderId) || !['grace', 'cancel'].includes(action) ||
-      (action === 'grace' && (!Number.isFinite(Date.parse(graceUntil)) || Date.parse(graceUntil) <= now().getTime()))) {
+      (action === 'grace' && (!Number.isFinite(Date.parse(graceUntil)) || Date.parse(graceUntil) <= now().getTime() ||
+        Date.parse(graceUntil) > now().getTime() + 30 * 86_400_000))) {
       fail('INVALID_REQUEST');
     }
     if (await authorizeLifecycle({ identity, action: `billing.checkout.${action}` }) !== true) fail('FORBIDDEN');
